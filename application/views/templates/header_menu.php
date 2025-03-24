@@ -31,7 +31,7 @@
 
                     <!-- Search for small devices -->
                     <div class="topbar-item d-flex d-xl-none">
-                        <button class="topbar-link btn btn-outline-primary btn-icon" data-bs-toggle="modal" data-bs-target="#searchModal" type="button">
+                        <button class="topbar-link btn btn-outline-primary btn-icon" data-bs-toggle="modal" data-bs-target="#searchModal" type="button" style="--bs-btn-hover-bg: var(--bs-info);--bs-btn-hover-border-color: var(--bs-info);--bs-btn-active-bg: var(--bs-info);--bs-btn-active-border-color: var(--bs-info);--bs-btn-disabled-color: var(--bs-info);">
                             <i class="ti ti-search fs-22"></i>
                         </button>
                     </div>
@@ -39,7 +39,7 @@
                     <!-- Notification Dropdown -->
                     <div class="topbar-item">
                         <div class="dropdown">
-                            <button class="topbar-link btn btn-outline-primary btn-icon dropdown-toggle drop-arrow-none" data-bs-toggle="dropdown" data-bs-offset="0,24" type="button" data-bs-auto-close="outside" aria-haspopup="false" aria-expanded="false">
+                            <button class="topbar-link btn btn-outline-primary btn-icon dropdown-toggle drop-arrow-none" data-bs-toggle="dropdown" data-bs-offset="0,24" type="button" data-bs-auto-close="outside" aria-haspopup="false" aria-expanded="false" style="--bs-btn-hover-bg: var(--bs-info);--bs-btn-hover-border-color: var(--bs-info);--bs-btn-active-bg: var(--bs-info);--bs-btn-active-border-color: var(--bs-info);--bs-btn-disabled-color: var(--bs-info);">
                                 <i class="ti ti-bell animate-ring fs-22"></i>
                                 <span class="noti-icon-badge"></span>
                             </button>
@@ -195,7 +195,7 @@
 
                     <!-- Light/Dark Mode Button -->
                     <div class="topbar-item d-none d-sm-flex">
-                        <button class="topbar-link btn btn-outline-primary btn-icon" id="light-dark-mode" type="button">
+                        <button class="topbar-link btn btn-outline-primary btn-icon" style="--bs-btn-hover-bg: var(--bs-info);--bs-btn-hover-border-color: var(--bs-info);--bs-btn-active-bg: var(--bs-info);--bs-btn-active-border-color: var(--bs-info);--bs-btn-disabled-color: var(--bs-info);" id="light-dark-mode" type="button">
                             <i class="ti ti-moon fs-22"></i>
                         </button>
                     </div>
@@ -203,7 +203,7 @@
                     <!-- User Dropdown -->
                     <div class="topbar-item">
                         <div class="dropdown">
-                            <a class="topbar-link btn btn-outline-primary dropdown-toggle drop-arrow-none" data-bs-toggle="dropdown" data-bs-offset="0,22" type="button" aria-haspopup="false" aria-expanded="false">
+                            <a class="topbar-link btn btn-outline-primary dropdown-toggle drop-arrow-none" style="--bs-btn-hover-bg: var(--bs-info);--bs-btn-hover-border-color: var(--bs-info);--bs-btn-active-bg: var(--bs-info);--bs-btn-active-border-color: var(--bs-info);--bs-btn-disabled-color: var(--bs-info);" data-bs-toggle="dropdown" data-bs-offset="0,22" type="button" aria-haspopup="false" aria-expanded="false">
                                 <img src="<?php echo base_url(); ?>assets/images/users/avatar-1.jpg" width="24" class="rounded-circle me-lg-2 d-flex" alt="user-image">
                                 <span class="d-lg-flex flex-column gap-1 d-none">
                                     <?php echo $user_data['firstname']; ?>
@@ -242,3 +242,23 @@
             </div>
         </header>
         <!-- Topbar End -->
+
+<script>
+$(document).ready(function() {
+    // Ensure dropdowns work correctly
+    $(document).on('click', '.dropdown-menu a', function(e) {
+        e.preventDefault(); // Prevent default anchor behavior
+        e.stopPropagation(); // Stop the event from bubbling up
+
+        // Handle specific actions based on the clicked item
+        var action = $(this).text().trim();
+        if (action === 'My Account') {
+            window.location.href = "<?php echo base_url('users/profile'); ?>";
+        } else if (action === 'Settings') {
+            window.location.href = "<?php echo base_url('users/setting'); ?>";
+        } else if (action === 'Log Out') {
+            window.location.href = "<?php echo base_url('auth/logout'); ?>";
+        }
+    });
+});
+</script>

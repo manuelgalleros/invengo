@@ -11,7 +11,7 @@ class Orders extends Admin_Controller
 		$this->not_logged_in();
 
 		$this->data['page_title'] = 'Orders';
-
+        $this->load->model('model_users');
 		$this->load->model('model_orders');
 		$this->load->model('model_products');
 		$this->load->model('model_company');
@@ -27,6 +27,8 @@ class Orders extends Admin_Controller
         }
 
 		$this->data['page_title'] = 'Manage Orders';
+        $user_id = $this->session->userdata('id');
+        $this->data['user_data'] = $this->model_users->getUserData($user_id);
 		$this->render_template('orders/index', $this->data);		
 	}
 
@@ -36,51 +38,88 @@ class Orders extends Admin_Controller
 	*/
 	public function fetchOrdersData()
 	{
-		$result = array('data' => array());
+		$page = $this->input->get('page') ? $this->input->get('page') : 1;
+		$per_page = 10;
+		$search = $this->input->get('search') ? $this->input->get('search') : '';
 
-		$data = $this->model_orders->getOrdersData();
+		// Get orders with pagination
+		$this->db->select('*');
+		$this->db->from('orders');
+		
+		if(!empty($search)) {
+			$this->db->group_start();
+			$this->db->like('bill_no', $search);
+			$this->db->or_like('customer_name', $search);
+			$this->db->or_like('customer_phone', $search);
+			$this->db->group_end();
+		}
 
-		foreach ($data as $key => $value) {
+		// Count total rows for pagination
+		$total_rows = $this->db->count_all_results('', false);
+		$total_pages = ceil($total_rows / $per_page);
 
-			$count_total_item = $this->model_orders->countOrderItem($value['id']);
-			$date = date('d-m-Y', $value['date_time']);
-			$time = date('h:i a', $value['date_time']);
+		// Get paginated results
+		$this->db->limit($per_page, ($page - 1) * $per_page);
+		$this->db->order_by('id', 'DESC');
+		$query = $this->db->get();
+		$orders = $query->result_array();
 
+		$data = array();
+		foreach ($orders as $order) {
+			$count_total_item = $this->model_orders->countOrderItem($order['id']);
+			$date = date('d-m-Y', $order['date_time']);
+			$time = date('h:i a', $order['date_time']);
 			$date_time = $date . ' ' . $time;
 
-			// button
-			$buttons = '';
-
-			if(in_array('viewOrder', $this->permission)) {
-				$buttons .= '<a target="__blank" href="'.base_url('orders/printDiv/'.$value['id']).'" class="btn btn-default"><i class="fa fa-print"></i></a>';
-			}
-
-			if(in_array('updateOrder', $this->permission)) {
-				$buttons .= ' <a href="'.base_url('orders/update/'.$value['id']).'" class="btn btn-default"><i class="fa fa-pencil"></i></a>';
-			}
-
-			if(in_array('deleteOrder', $this->permission)) {
-				$buttons .= ' <button type="button" class="btn btn-default" onclick="removeFunc('.$value['id'].')" data-toggle="modal" data-target="#removeModal"><i class="fa fa-trash"></i></button>';
-			}
-
-			if($value['paid_status'] == 1) {
-				$paid_status = '<span class="label label-success">Paid</span>';	
-			}
-			else {
-				$paid_status = '<span class="label label-warning">Not Paid</span>';
-			}
-
-			$result['data'][$key] = array(
-				$value['bill_no'],
-				$value['customer_name'],
-				$value['customer_phone'],
-				$date_time,
-				$count_total_item,
-				$value['net_amount'],
-				$paid_status,
-				$buttons
+			$data[] = array(
+				'id' => $order['id'],
+				'bill_no' => $order['bill_no'],
+				'customer_name' => $order['customer_name'],
+				'customer_phone' => $order['customer_phone'],
+				'date_time' => $date_time,
+				'total_products' => $count_total_item,
+				'net_amount' => $order['net_amount'],
+				'paid_status' => $order['paid_status']
 			);
-		} // /foreach
+		}
+
+		// Calculate range info
+		$start = ($page - 1) * $per_page + 1;
+		$end = min($start + $per_page - 1, $total_rows);
+		$range_info = "Showing $start to $end of $total_rows orders";
+
+		// Generate pagination HTML
+		$pagination = '';
+		
+		// Previous button
+		$prev_disabled = ($page <= 1) ? 'disabled' : '';
+		$pagination .= '<li class="page-item ' . $prev_disabled . '">
+							<a href="#" class="page-link" data-page="' . ($page - 1) . '">
+								<i class="ti ti-chevrons-left"></i>
+							</a>
+						</li>';
+
+		// Page numbers
+		for ($i = 1; $i <= $total_pages; $i++) {
+			$active = ($i == $page) ? 'active' : '';
+			$pagination .= '<li class="page-item ' . $active . '">
+							<a href="#" class="page-link" data-page="' . $i . '">' . $i . '</a>
+						</li>';
+		}
+
+		// Next button
+		$next_disabled = ($page >= $total_pages) ? 'disabled' : '';
+		$pagination .= '<li class="page-item ' . $next_disabled . '">
+							<a href="#" class="page-link" data-page="' . ($page + 1) . '">
+								<i class="ti ti-chevrons-right"></i>
+							</a>
+						</li>';
+
+		$result = array(
+			'data' => $data,
+			'pagination' => $pagination,
+			'range_info' => $range_info
+		);
 
 		echo json_encode($result);
 	}
@@ -121,7 +160,10 @@ class Orders extends Admin_Controller
         	$this->data['is_vat_enabled'] = ($company['vat_charge_value'] > 0) ? true : false;
         	$this->data['is_service_enabled'] = ($company['service_charge_value'] > 0) ? true : false;
 
-        	$this->data['products'] = $this->model_products->getActiveProductData();      	
+        	$this->data['products'] = $this->model_products->getActiveProductData();  
+            $user_id = $this->session->userdata('id');
+            $this->data['user_data'] = $this->model_users->getUserData($user_id);
+            $this->render_template('orders/index', $this->data);
 
             $this->render_template('orders/create', $this->data);
         }	
@@ -224,19 +266,30 @@ class Orders extends Admin_Controller
 
         $response = array();
         if($order_id) {
-            $delete = $this->model_orders->remove($order_id);
-            if($delete == true) {
+            // Handle both single and multiple deletions
+            $order_ids = is_array($order_id) ? $order_id : array($order_id);
+            
+            $success = true;
+            foreach($order_ids as $id) {
+                $delete = $this->model_orders->remove($id);
+                if(!$delete) {
+                    $success = false;
+                    break;
+                }
+            }
+            
+            if($success) {
                 $response['success'] = true;
-                $response['messages'] = "Successfully removed"; 
-            }
-            else {
+                $response['messages'] = count($order_ids) > 1 ? 
+                    "Successfully removed ".count($order_ids)." orders" : 
+                    "Successfully removed";
+            } else {
                 $response['success'] = false;
-                $response['messages'] = "Error in the database while removing the product information";
+                $response['messages'] = "Error in the database while removing the order(s)";
             }
-        }
-        else {
+        } else {
             $response['success'] = false;
-            $response['messages'] = "Refersh the page again!!";
+            $response['messages'] = "Please select orders to delete";
         }
 
         echo json_encode($response); 

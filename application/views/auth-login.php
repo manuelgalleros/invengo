@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <title>Log In</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="shortcut icon" href="<?php echo base_url()?>assets/images/favicon.ico">
+    <link rel="shortcut icon" href="<?php echo base_url()?>assets/images/FullLogo_Transparent.png">
     <script src="<?php echo base_url()?>assets/js/config.js"></script>
     <link href="<?php echo base_url()?>assets/css/vendor.min.css" rel="stylesheet" type="text/css" />
     <link href="<?php echo base_url()?>assets/css/app.min.css" rel="stylesheet" type="text/css" id="app-style" />
