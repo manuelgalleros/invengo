@@ -8,7 +8,7 @@ class Dashboard extends Admin_Controller
 
 		$this->not_logged_in();
 
-		$this->data['page_title'] = 'Dashboard';
+		$this->data['page_title'] = 'Dashboard | Invengo';
 		
 		$this->load->model('model_products');
 		$this->load->model('model_orders');

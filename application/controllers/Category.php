@@ -13,6 +13,7 @@ class Category extends Admin_Controller
 		$this->data['page_title'] = 'Category';
 
 		$this->load->model('model_category');
+		$this->load->model('model_users');
 	}
 
 	/* 
@@ -25,7 +26,10 @@ class Category extends Admin_Controller
 			redirect('dashboard', 'refresh');
 		}
 
+		$user_id = $this->session->userdata('id');
+        $this->data['user_data'] = $this->model_users->getUserData($user_id);
 		$this->render_template('category/index', $this->data);	
+
 	}	
 
 	/*
@@ -52,10 +56,12 @@ class Category extends Admin_Controller
 	{
 		$result = array('data' => array());
 
-		$data = $this->model_category->getCategoryData();
+		$page = $this->input->get('page') ? $this->input->get('page') : 1;
+		$search = $this->input->get('search') ? $this->input->get('search') : '';
 
-		foreach ($data as $key => $value) {
+		$data = $this->model_category->getCategoryData(null, $page, $search);
 
+		foreach ($data['data'] as $key => $value) {
 			// button
 			$buttons = '';
 
@@ -67,7 +73,6 @@ class Category extends Admin_Controller
 				$buttons .= ' <button type="button" class="btn btn-default" onclick="removeFunc('.$value['id'].')" data-toggle="modal" data-target="#removeModal"><i class="fa fa-trash"></i></button>';
 			}
 				
-
 			$status = ($value['active'] == 1) ? '<span class="label label-success">Active</span>' : '<span class="label label-warning">Inactive</span>';
 
 			$result['data'][$key] = array(
@@ -76,6 +81,13 @@ class Category extends Admin_Controller
 				$buttons
 			);
 		} // /foreach
+
+		$result['pagination'] = array(
+			'total_records' => $data['total_records'],
+			'total_pages' => $data['total_pages'],
+			'current_page' => $data['current_page'],
+			'limit' => $data['limit']
+		);
 
 		echo json_encode($result);
 	}

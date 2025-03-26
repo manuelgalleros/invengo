@@ -40,33 +40,30 @@ class Brands extends Admin_Controller
 	*/
 	public function fetchBrandData()
 	{
-		$result = array('data' => array());
+		$page = $this->input->get('page') ? $this->input->get('page') : 1;
+		$per_page = 10;
+		$search = $this->input->get('search') ? $this->input->get('search') : '';
+		
+		$result = $this->model_brands->getBrandData(null, $page, $per_page, $search);
+		$brands = $result['brands'];
+		$total_rows = $result['total_rows'];
 
-		$data = $this->model_brands->getBrandData();
-		foreach ($data as $key => $value) {
+		$response = array(
+			'data' => array(),
+			'total_rows' => $total_rows,
+			'per_page' => $per_page
+		);
 
-			// button
-			$buttons = '';
-
-			if(in_array('viewBrand', $this->permission)) {
-				$buttons .= '<button type="button" class="btn btn-default" onclick="editBrand('.$value['id'].')" data-toggle="modal" data-target="#editBrandModal"><i class="fa fa-pencil"></i></button>';	
-			}
+		foreach ($brands as $key => $value) {
+			$status = ($value['active'] == 1) ? '<span class="badge badge-outline-success">Active</span>' : '<span class="badge badge-outline-danger">Inactive</span>';
 			
-			if(in_array('deleteBrand', $this->permission)) {
-				$buttons .= ' <button type="button" class="btn btn-default" onclick="removeBrand('.$value['id'].')" data-toggle="modal" data-target="#removeBrandModal"><i class="fa fa-trash"></i></button>
-				';
-			}				
-
-			$status = ($value['active'] == 1) ? '<span class="label label-success">Active</span>' : '<span class="label label-warning">Inactive</span>';
-
-			$result['data'][$key] = array(
+			$response['data'][$key] = array(
 				$value['name'],
-				$status,
-				$buttons
+				$status
 			);
-		} // /foreach
+		}
 
-		echo json_encode($result);
+		echo json_encode($response);
 	}
 
 	/*

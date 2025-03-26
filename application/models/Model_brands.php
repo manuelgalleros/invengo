@@ -16,7 +16,7 @@ class Model_brands extends CI_Model
 	}
 
 	/* get the brand data */
-	public function getBrandData($id = null)
+	public function getBrandData($id = null, $page = 1, $per_page = 10, $search = '')
 	{
 		if($id) {
 			$sql = "SELECT * FROM brands WHERE id = ?";
@@ -24,9 +24,42 @@ class Model_brands extends CI_Model
 			return $query->row_array();
 		}
 
-		$sql = "SELECT * FROM brands";
-		$query = $this->db->query($sql);
-		return $query->result_array();
+		// Calculate offset
+		$offset = ($page - 1) * $per_page;
+
+		// Build the base query for counting
+		$this->db->select('COUNT(*) as total');
+		$this->db->from('brands');
+
+		// Add search condition if search term is provided
+		if (!empty($search)) {
+			$this->db->like('name', $search);
+		}
+
+		// Get total rows for pagination
+		$query = $this->db->get();
+		$total_rows = $query->row()->total;
+
+		// Get paginated results
+		$this->db->select('*');
+		$this->db->from('brands');
+
+		// Add search condition again for the actual query
+		if (!empty($search)) {
+			$this->db->like('name', $search);
+		}
+
+		$this->db->order_by('id', 'DESC');
+		$this->db->limit($per_page, $offset);
+		$query = $this->db->get();
+
+		$brands = $query->result_array();
+
+		return array(
+			'brands' => $brands,
+			'total_rows' => $total_rows,
+			'per_page' => $per_page
+		);
 	}
 
 	public function create($data)

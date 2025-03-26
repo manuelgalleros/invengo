@@ -16,7 +16,7 @@ class Model_category extends CI_Model
 	}
 
 	/* get the brand data */
-	public function getCategoryData($id = null)
+	public function getCategoryData($id = null, $page = 1, $search = '')
 	{
 		if($id) {
 			$sql = "SELECT * FROM categories WHERE id = ?";
@@ -24,9 +24,38 @@ class Model_category extends CI_Model
 			return $query->row_array();
 		}
 
+		$limit = 10;
+		$offset = ($page - 1) * $limit;
+
 		$sql = "SELECT * FROM categories";
-		$query = $this->db->query($sql);
-		return $query->result_array();
+		
+		if($search) {
+			$sql .= " WHERE name LIKE ?";
+			$query = $this->db->query($sql, array('%' . $search . '%'));
+		} else {
+			$query = $this->db->query($sql);
+		}
+
+		$total_records = $query->num_rows();
+		$total_pages = ceil($total_records / $limit);
+
+		// Get paginated results
+		$sql .= $search ? " WHERE name LIKE ?" : "";
+		$sql .= " LIMIT ? OFFSET ?";
+		
+		if($search) {
+			$query = $this->db->query($sql, array('%' . $search . '%', $limit, $offset));
+		} else {
+			$query = $this->db->query($sql, array($limit, $offset));
+		}
+
+		return array(
+			'data' => $query->result_array(),
+			'total_records' => $total_records,
+			'total_pages' => $total_pages,
+			'current_page' => $page,
+			'limit' => $limit
+		);
 	}
 
 	public function create($data)

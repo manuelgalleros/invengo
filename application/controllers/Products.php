@@ -10,7 +10,7 @@ class Products extends Admin_Controller
 
 		$this->not_logged_in();
 
-		$this->data['page_title'] = 'Products';
+		$this->data['page_title'] = 'Manage Products';
 
 		$this->load->model('model_products');
 		$this->load->model('model_brands');
@@ -74,7 +74,7 @@ class Products extends Admin_Controller
                 <td>'.$product['description'].'</td>
                 <td>₱'.number_format($product['price'], 2).'</td>
                 <td>
-                    <span class="badge rounded-pill '.($product['qty'] > 10 ? 'badge-soft-success' : 'badge-soft-danger').'">
+                    <span class="badge '.($product['qty'] > 10 ? 'badge-outline-success' : 'badge-outline-danger').'">
                         '.$product['qty'].'
                     </span>
                 </td>
@@ -98,7 +98,7 @@ class Products extends Admin_Controller
             
             // Previous button
             paginationHtml += \'<li class="page-item \' + (currentPage === 1 ? "disabled" : "") + \'">\';
-            paginationHtml += \'<a href="#" class="page-link" data-page="\' + (currentPage - 1) + \'"><i class="ti ti-chevrons-left"></i></a>\';
+            paginationHtml += \'<a href="#" class="page-link" data-page="\' + (currentPage - 1) + \'">Previous</a>\';
             paginationHtml += \'</li>\';
 
             // Page numbers
@@ -110,7 +110,7 @@ class Products extends Admin_Controller
 
             // Next button
             paginationHtml += \'<li class="page-item \' + (currentPage === totalPages ? "disabled" : "") + \'">\';
-            paginationHtml += \'<a href="#" class="page-link" data-page="\' + (currentPage + 1) + \'"><i class="ti ti-chevrons-right"></i></a>\';
+            paginationHtml += \'<a href="#" class="page-link" data-page="\' + (currentPage + 1) + \'">Next</a>\';
             paginationHtml += \'</li>\';
 
             $("#productFooter .pagination").html(paginationHtml);
@@ -142,7 +142,7 @@ public function create()
     if (!in_array('createProduct', $this->permission)) {
         redirect('dashboard', 'refresh');
     }
-
+    $this->data['page_title'] = 'Add Products';
     $this->data['brands'] = $this->model_brands->getActiveBrands();        	
     $this->data['category'] = $this->model_category->getActiveCategroy();     
     $user_id = $this->session->userdata('id');

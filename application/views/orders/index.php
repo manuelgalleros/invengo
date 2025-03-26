@@ -383,27 +383,63 @@ function loadOrderTable(page = 1, search = '') {
             $("#manageTable tbody").html(html);
             
             // Update pagination if provided
-            if (response && response.pagination) {
-                $(".pagination").html(response.pagination);
-                $("#productFooter").show();
+            if (response && response.data && response.data.length > 0) {
+                // Update pagination status
+                const start = (page - 1) * 10 + 1;
+                const end = Math.min(start + response.data.length - 1, response.data.length);
+                const total = response.data.length;
+                
+                $(".text-muted").html(`
+                    Showing ${start} to ${end} of ${total} entries
+                `).fadeIn();
 
-                // Handle pagination clicks
-                $(".pagination .page-link").click(function(e) {
-                    e.preventDefault();
-                    var pageNum = $(this).data('page');
-                    if (pageNum > 0) {
-                        loadOrderTable(pageNum, $('#searchBox').val());
-                    }
-                });
+                // Generate pagination
+                let totalPages = Math.ceil(total / 10);
+                let paginationHtml = '';
+                
+                // Always show pagination container
+                $(".pagination").show();
+                
+                // Previous button
+                paginationHtml += `
+                    <li class="page-item ${page <= 1 ? 'disabled' : ''}">
+                        <a class="page-link" href="javascript:void(0);" onclick="loadOrderTable(${page - 1}, '${search}')">
+                            Previous
+                        </a>
+                    </li>
+                `;
+                
+                // Page numbers
+                for(let i = 1; i <= totalPages; i++) {
+                    paginationHtml += `
+                        <li class="page-item ${i === parseInt(page) ? 'active' : ''}">
+                            <a class="page-link" href="javascript:void(0);" onclick="loadOrderTable(${i}, '${search}')">${i}</a>
+                        </li>
+                    `;
+                }
+                
+                // Next button
+                paginationHtml += `
+                    <li class="page-item ${page >= totalPages ? 'disabled' : ''}">
+                        <a class="page-link" href="javascript:void(0);" onclick="loadOrderTable(${page + 1}, '${search}')">
+                            Next
+                        </a>
+                    </li>
+                `;
+                
+                $(".pagination").html(paginationHtml);
+                $("#productFooter").show();
             } else {
-                $("#productFooter").hide();
+                $("#manageTable tbody").html(`
+                    <tr>
+                        <td colspan="8" class="text-center">No orders found</td>
+                    </tr>
+                `);
+                $(".text-muted").html('Showing 0 to 0 of 0 entries').fadeIn();
+                $(".pagination").html('');
+                $("#productFooter").show();
             }
             
-            // Update range info if provided
-            if (response && response.range_info) {
-                $(".text-muted").html(response.range_info);
-            }
-
             // Reset checkboxes and actions
             $('#checkAll').prop('checked', false);
             $('.order-actions').hide();
@@ -422,9 +458,6 @@ function loadOrderTable(page = 1, search = '') {
         }
     });
 }
-
-// Remove the old pagination click handler since it's now handled in the success callback
-$(document).off('click', '.pagination .page-link');
 
 // Handle order update
 $("#editOrderForm").submit(function(e) {
