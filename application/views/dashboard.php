@@ -14,7 +14,7 @@
 
                 <div class="row">
                     <div class="col">
-                        <div class="row row-cols-xxl-4 row-cols-md-2 row-cols-1 text-center">
+                        <div class="row row-cols-xl-4 row-cols-md-2 row-cols-1 text-center">
                             <div class="col">
                                 <div class="card">
                                     <div class="card-body">

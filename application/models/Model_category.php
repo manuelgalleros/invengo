@@ -15,6 +15,14 @@ class Model_category extends CI_Model
 		return $query->result_array();
 	}
 
+	/* get active category data with full details */
+	public function getActiveCategroyData()
+	{
+		$sql = "SELECT * FROM categories WHERE active = ?";
+		$query = $this->db->query($sql, array(1));
+		return $query->result_array();
+	}
+
 	/* get the brand data */
 	public function getCategoryData($id = null, $page = 1, $search = '')
 	{
@@ -78,7 +86,12 @@ class Model_category extends CI_Model
 	public function remove($id)
 	{
 		if($id) {
-			$this->db->where('id', $id);
+			// Check if $id is an array for multiple deletion
+			if(is_array($id)) {
+				$this->db->where_in('id', $id);
+			} else {
+				$this->db->where('id', $id);
+			}
 			$delete = $this->db->delete('categories');
 			return ($delete == true) ? true : false;
 		}

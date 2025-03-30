@@ -38,14 +38,14 @@ class Category extends Admin_Controller
 	* returns the data into json format. 
 	* This function is invoked from the view page.
 	*/
-	public function fetchCategoryDataById($id) 
+	public function fetchCategoryDataById() 
 	{
-		if($id) {
-			$data = $this->model_category->getCategoryData($id);
+		$category_id = $this->input->post('category_id');
+		
+		if($category_id) {
+			$data = $this->model_category->getCategoryData($category_id);
 			echo json_encode($data);
 		}
-
-		return false;
 	}
 
 	/*
@@ -73,12 +73,13 @@ class Category extends Admin_Controller
 				$buttons .= ' <button type="button" class="btn btn-default" onclick="removeFunc('.$value['id'].')" data-toggle="modal" data-target="#removeModal"><i class="fa fa-trash"></i></button>';
 			}
 				
-			$status = ($value['active'] == 1) ? '<span class="label label-success">Active</span>' : '<span class="label label-warning">Inactive</span>';
+			$status = ($value['active'] == 1) ? '<span class="badge bg-success">Active</span>' : '<span class="badge bg-danger">Inactive</span>';
 
 			$result['data'][$key] = array(
-				$value['name'],
-				$status,
-				$buttons
+				'id' => $value['id'],
+				'name' => $value['name'],
+				'active' => $value['active'],
+				'status' => $status
 			);
 		} // /foreach
 
@@ -111,19 +112,22 @@ class Category extends Admin_Controller
 		$this->form_validation->set_error_delimiters('<p class="text-danger">','</p>');
 
         if ($this->form_validation->run() == TRUE) {
+            // Get category name for success message
+            $category_name = $this->input->post('category_name');
+            
         	$data = array(
-        		'name' => $this->input->post('category_name'),
+        		'name' => $category_name,
         		'active' => $this->input->post('active'),	
         	);
 
         	$create = $this->model_category->create($data);
         	if($create == true) {
         		$response['success'] = true;
-        		$response['messages'] = 'Succesfully created';
+        		$response['messages'] = "Category '" . $category_name . "' successfully created.";
         	}
         	else {
         		$response['success'] = false;
-        		$response['messages'] = 'Error in the database while creating the brand information';			
+        		$response['messages'] = 'Error in the database while creating the category information.';			
         	}
         }
         else {
@@ -141,35 +145,38 @@ class Category extends Admin_Controller
 	* and if the validation is successfully then it updates the data into the database 
 	* and returns the json format operation messages
 	*/
-	public function update($id)
+	public function update()
 	{
-
 		if(!in_array('updateCategory', $this->permission)) {
 			redirect('dashboard', 'refresh');
 		}
 
 		$response = array();
+		$category_id = $this->input->post('category_id');
 
-		if($id) {
-			$this->form_validation->set_rules('edit_category_name', 'Category name', 'trim|required');
-			$this->form_validation->set_rules('edit_active', 'Active', 'trim|required');
+		if($category_id) {
+			$this->form_validation->set_rules('category_name', 'Category name', 'trim|required');
+			$this->form_validation->set_rules('active', 'Active', 'trim|required');
 
 			$this->form_validation->set_error_delimiters('<p class="text-danger">','</p>');
 
 	        if ($this->form_validation->run() == TRUE) {
+	        	// Get category name for success message
+	        	$category_name = $this->input->post('category_name');
+	        	
 	        	$data = array(
-	        		'name' => $this->input->post('edit_category_name'),
-	        		'active' => $this->input->post('edit_active'),	
+	        		'name' => $category_name,
+	        		'active' => $this->input->post('active'),	
 	        	);
 
-	        	$update = $this->model_category->update($data, $id);
+	        	$update = $this->model_category->update($data, $category_id);
 	        	if($update == true) {
 	        		$response['success'] = true;
-	        		$response['messages'] = 'Succesfully updated';
+	        		$response['messages'] = "Category '" . $category_name . "' successfully updated.";
 	        	}
 	        	else {
 	        		$response['success'] = false;
-	        		$response['messages'] = 'Error in the database while updated the brand information';			
+	        		$response['messages'] = 'Error in the database while updating the category information';			
 	        	}
 	        }
 	        else {
@@ -201,19 +208,41 @@ class Category extends Admin_Controller
 
 		$response = array();
 		if($category_id) {
+			// Get category name(s) before deletion
+			$category_names = [];
+			if(is_array($category_id)) {
+				foreach($category_id as $id) {
+					$category_data = $this->model_category->getCategoryData($id);
+					if($category_data) {
+						$category_names[] = $category_data['name'];
+					}
+				}
+			} else {
+				$category_data = $this->model_category->getCategoryData($category_id);
+				if($category_data) {
+					$category_names[] = $category_data['name'];
+				}
+			}
+			
+			// Delete the category(s)
 			$delete = $this->model_category->remove($category_id);
+			
 			if($delete == true) {
 				$response['success'] = true;
-				$response['messages'] = "Successfully removed";	
+				if(count($category_names) == 1) {
+					$response['messages'] = "Category '" . $category_names[0] . "' successfully removed.";
+				} else {
+					$response['messages'] = count($category_names) . " categories successfully removed: " . implode(", ", $category_names);
+				}
 			}
 			else {
 				$response['success'] = false;
-				$response['messages'] = "Error in the database while removing the brand information";
+				$response['messages'] = "Error in the database while removing the category information";
 			}
 		}
 		else {
 			$response['success'] = false;
-			$response['messages'] = "Refersh the page again!!";
+			$response['messages'] = "Refresh the page again!!";
 		}
 
 		echo json_encode($response);

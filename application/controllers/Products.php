@@ -198,12 +198,6 @@ public function create()
 }
 
 
-
-        
-
-    
-
-
     /*
     * This function is invoked from another function to upload the image into the assets folder
     * and returns the image path
@@ -410,6 +404,340 @@ public function create()
         } else {
             echo json_encode(['success' => false, 'message' => 'Product not found']);
         }
+    }
+
+    public function import() {
+        if(!in_array('createProduct', $this->permission)) {
+            $response = array(
+                'success' => false,
+                'message' => 'You do not have permission to import products.'
+            );
+        } else {
+            if(isset($_FILES['file'])) {
+                $file = $_FILES['file'];
+                
+                // Check file extension
+                $file_ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                if($file_ext != 'xlsx') {
+                    $response = array(
+                        'success' => false,
+                        'message' => 'Please upload an Excel file (.xlsx)'
+                    );
+                } else {
+                    require_once(APPPATH . '../vendor/autoload.php');
+                    
+                    $reader = new \PhpOffice\PhpSpreadsheet\Reader\Xlsx();
+                    $spreadsheet = $reader->load($file['tmp_name']);
+                    $worksheet = $spreadsheet->getActiveSheet();
+                    
+                    $rows = $worksheet->toArray();
+                    $header = array_shift($rows); // Remove header row
+                    
+                    // Validate header
+                    $required_headers = ['Product Name', 'SKU', 'Description', 'Barcode', 'Category', 'Brand', 'Price', 'Quantity', 'Availability'];
+                    $header_matches = array_diff($required_headers, $header);
+                    
+                    if(!empty($header_matches)) {
+                        $response = array(
+                            'success' => false,
+                            'message' => 'Invalid Excel format. Please check the column headers. Missing: ' . implode(', ', $header_matches)
+                        );
+                    } else {
+                        // Get all available categories and brands for mapping
+                        $categories = $this->model_category->getActiveCategroyData();
+                        $brands = $this->model_brands->getActiveBrandsData();
+                        
+                        // Create lookup arrays for category and brand names to IDs
+                        $category_lookup = [];
+                        foreach ($categories as $category) {
+                            $category_lookup[strtolower($category['name'])] = $category['id'];
+                        }
+                        
+                        $brand_lookup = [];
+                        foreach ($brands as $brand) {
+                            $brand_lookup[strtolower($brand['name'])] = $brand['id'];
+                        }
+                        
+                        $success_count = 0;
+                        $error_count = 0;
+                        $errors = [];
+                        $row_count = 0;
+                        $new_categories = [];
+                        $new_brands = [];
+                        
+                        foreach($rows as $row) {
+                            $row_count++;
+                            
+                            // Skip empty rows
+                            if (empty($row[0])) {
+                                continue;
+                            }
+                            
+                            // Convert category and brand names to IDs
+                            $category_name = trim($row[4]);
+                            $brand_name = trim($row[5]);
+                            
+                            $category_id = null;
+                            $brand_id = null;
+                            
+                            // Look up category ID from name or create a new category
+                            if (isset($category_lookup[strtolower($category_name)])) {
+                                $category_id = $category_lookup[strtolower($category_name)];
+                            } else {
+                                // Create a new category
+                                $category_data = array(
+                                    'name' => $category_name,
+                                    'active' => 1
+                                );
+                                
+                                $this->model_category->create($category_data);
+                                $category_id = $this->db->insert_id();
+                                
+                                // Add to lookup array for future use
+                                $category_lookup[strtolower($category_name)] = $category_id;
+                                $new_categories[] = $category_name;
+                            }
+                            
+                            // Look up brand ID from name or create a new brand
+                            if (isset($brand_lookup[strtolower($brand_name)])) {
+                                $brand_id = $brand_lookup[strtolower($brand_name)];
+                            } else {
+                                // Create a new brand
+                                $brand_data = array(
+                                    'name' => $brand_name,
+                                    'active' => 1
+                                );
+                                
+                                $this->model_brands->create($brand_data);
+                                $brand_id = $this->db->insert_id();
+                                
+                                // Add to lookup array for future use
+                                $brand_lookup[strtolower($brand_name)] = $brand_id;
+                                $new_brands[] = $brand_name;
+                            }
+                            
+                            // Validate required fields
+                            if (empty($row[0]) || empty($row[1]) || empty($row[6]) || empty($row[7])) {
+                                $errors[] = "Row $row_count: Missing required fields (Product Name, SKU, Price, or Quantity)";
+                                $error_count++;
+                                continue;
+                            }
+                            
+                            // Validate numeric fields
+                            if (!is_numeric($row[6]) || !is_numeric($row[7]) || !in_array($row[8], ['0', '1'])) {
+                                $errors[] = "Row $row_count: Price, Quantity, or Availability has invalid format";
+                                $error_count++;
+                                continue;
+                            }
+                            
+                            $data = array(
+                                'name' => $row[0],
+                                'sku' => $row[1],
+                                'description' => $row[2],
+                                'barcode' => $row[3],
+                                'category_id' => $category_id,
+                                'brand_id' => $brand_id,
+                                'price' => $row[6],
+                                'qty' => $row[7],
+                                'availability' => $row[8],
+                                'image' => 'default-product.png' // Default image
+                            );
+                            
+                            if($this->model_products->create($data)) {
+                                $success_count++;
+                            } else {
+                                $error_count++;
+                                $errors[] = "Row $row_count: Database error - Failed to import product";
+                            }
+                        }
+                        
+                        if($success_count > 0) {
+                            $message = "Import completed. Successfully imported: $success_count, Failed: $error_count";
+                            
+                            // Add info about created categories and brands
+                            if (!empty($new_categories) || !empty($new_brands)) {
+                                $created_msg = [];
+                                if (!empty($new_categories)) {
+                                    $unique_categories = array_unique($new_categories);
+                                    $created_msg[] = "Created " . count($unique_categories) . " new categories";
+                                }
+                                if (!empty($new_brands)) {
+                                    $unique_brands = array_unique($new_brands);
+                                    $created_msg[] = "Created " . count($unique_brands) . " new brands";
+                                }
+                                
+                                if (!empty($created_msg)) {
+                                    $message .= " (" . implode(", ", $created_msg) . ")";
+                                }
+                            }
+                            
+                            $response = array(
+                                'success' => true,
+                                'message' => $message,
+                            );
+                            
+                            if (!empty($errors)) {
+                                $response['errors'] = $errors;
+                            }
+                        } else {
+                            $response = array(
+                                'success' => false,
+                                'message' => "Import failed. No products were imported.",
+                                'errors' => $errors
+                            );
+                        }
+                    }
+                }
+            } else {
+                $response = array(
+                    'success' => false,
+                    'message' => 'No file uploaded'
+                );
+            }
+        }
+        
+        echo json_encode($response);
+    }
+    
+
+    public function generate_sample_excel() {
+        require_once(APPPATH . '../vendor/autoload.php');
+        
+        // Create new Spreadsheet object
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        
+        // Set headers
+        $headers = [
+            'Product Name', 'SKU', 'Description', 'Barcode', 'Category', 'Brand', 'Price', 'Quantity', 'Availability'
+        ];
+        
+        // Add headers to the sheet
+        foreach(range('A', 'I') as $index => $column) {
+            $sheet->setCellValue($column . '1', $headers[$index]);
+        }
+        
+        // Get some real category and brand names from database
+        $categories = $this->model_category->getActiveCategroyData();
+        $brands = $this->model_brands->getActiveBrandsData();
+        
+        // Default values if no categories or brands exist
+        $category_names = ['General', 'Electronics', 'Accessories'];
+        $brand_names = ['Generic', 'Premium', 'Standard'];
+        
+        // Use actual category and brand names if available
+        if (!empty($categories)) {
+            $category_names = array_column(array_slice($categories, 0, 3), 'name');
+        }
+        
+        if (!empty($brands)) {
+            $brand_names = array_column(array_slice($brands, 0, 3), 'name');
+        }
+        
+        // Sample data
+        $sample_data = [
+            [
+                'Gaming Laptop', 'LAP-001', 'High-performance gaming laptop with RTX 3080', '8901234567890',
+                $category_names[0], $brand_names[0], '89999.99', '10', '1'
+            ],
+            [
+                'Wireless Mouse', 'MOU-002', 'Ergonomic wireless mouse with RGB', '8901234567891',
+                isset($category_names[1]) ? $category_names[1] : $category_names[0], 
+                isset($brand_names[1]) ? $brand_names[1] : $brand_names[0], 
+                '2499.99', '25', '1'
+            ],
+            [
+                'Mechanical Keyboard', 'KEY-003', 'RGB mechanical keyboard with Cherry MX switches', '8901234567892',
+                isset($category_names[2]) ? $category_names[2] : $category_names[0], 
+                isset($brand_names[2]) ? $brand_names[2] : $brand_names[0], 
+                '5499.99', '15', '1'
+            ]
+        ];
+        
+        // Add sample data to the sheet
+        foreach($sample_data as $row_index => $row_data) {
+            foreach(range('A', 'I') as $column_index => $column) {
+                $sheet->setCellValue($column . ($row_index + 2), $row_data[$column_index]);
+            }
+        }
+        
+        // Add a comment to the Availability column header explaining the values
+        $comment = $sheet->getComment('I1');
+        if (!$comment) {
+            $comment = $sheet->getCommentByColumnAndRow(9, 1);
+        }
+        $comment->setText('Use "1" for Available products, "0" for Unavailable products.');
+        
+        // Add a comment to the Category column header
+        $commentCategory = $sheet->getComment('E1');
+        if (!$commentCategory) {
+            $commentCategory = $sheet->getCommentByColumnAndRow(5, 1);
+        }
+        $commentCategory->setText('If category does not exist, it will be created automatically.');
+        
+        // Add a comment to the Brand column header
+        $commentBrand = $sheet->getComment('F1');
+        if (!$commentBrand) {
+            $commentBrand = $sheet->getCommentByColumnAndRow(6, 1);
+        }
+        $commentBrand->setText('If brand does not exist, it will be created automatically.');
+        
+        // Auto-size columns
+        foreach(range('A', 'I') as $column) {
+            $sheet->getColumnDimension($column)->setAutoSize(true);
+        }
+        
+        // Set header style
+        $headerStyle = [
+            'font' => [
+                'bold' => true,
+                'color' => ['rgb' => 'FFFFFF'],
+            ],
+            'fill' => [
+                'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                'startColor' => ['rgb' => '4472C4'],
+            ],
+        ];
+        $sheet->getStyle('A1:I1')->applyFromArray($headerStyle);
+        
+        // Add available categories and brands in a separate sheet for reference
+        $infoSheet = $spreadsheet->createSheet();
+        $infoSheet->setTitle('Available References');
+        
+        // Add available categories
+        $infoSheet->setCellValue('A1', 'Available Categories');
+        $infoSheet->getStyle('A1')->getFont()->setBold(true);
+        
+        foreach ($categories as $index => $category) {
+            $infoSheet->setCellValue('A' . ($index + 2), $category['name']);
+        }
+        
+        // Add available brands
+        $infoSheet->setCellValue('C1', 'Available Brands');
+        $infoSheet->getStyle('C1')->getFont()->setBold(true);
+        
+        foreach ($brands as $index => $brand) {
+            $infoSheet->setCellValue('C' . ($index + 2), $brand['name']);
+        }
+        
+        // Auto-size columns in info sheet
+        $infoSheet->getColumnDimension('A')->setAutoSize(true);
+        $infoSheet->getColumnDimension('C')->setAutoSize(true);
+        
+        // Set first sheet as active
+        $spreadsheet->setActiveSheetIndex(0);
+        
+        // Create the writer
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        
+        // Set headers for download
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment;filename="sample_products.xlsx"');
+        header('Cache-Control: max-age=0');
+        
+        // Save file to PHP output stream
+        $writer->save('php://output');
+        exit;
     }
 
 }

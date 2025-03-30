@@ -61,7 +61,7 @@
                                             <?php endif; ?>
                                             <?php if(in_array('deleteCategory', $user_permission)): ?>
                                                 <li>
-                                                    <a class="dropdown-item delete-item" href="javascript:void(0);">
+                                                    <a class="dropdown-item delete-item text-danger" href="javascript:void(0);">
                                                         <i class="ti ti-trash me-2"></i> Delete
                                                     </a>
                                                 </li>
@@ -104,7 +104,6 @@
             </div>
         </div>
     </div>
-</div>
 
 <?php if(in_array('createCategory', $user_permission)): ?>
 <!-- Add Category Modal -->
@@ -224,18 +223,14 @@ function loadCategoryTable(page = 1, search = '') {
             if(response.data && response.data.length > 0) {
                 let tableHtml = '';
                 response.data.forEach(function(row) {
-                    // row[0] is category name
-                    // row[1] is status badge (need to convert from label to badge)
-                    let statusBadge = row[1].replace('label label-success', 'badge bg-success')
-                                         .replace('label label-warning', 'badge bg-danger');
-                    
+                    // Use object notation instead of array notation
                     tableHtml += `
                         <tr>
                             <td class="ps-3">
-                                <input type="checkbox" class="form-check-input category-check" value="${row[0]}">
+                                <input type="checkbox" class="form-check-input category-check" value="${row.id}">
                             </td>
-                            <td>${row[0]}</td>
-                            <td>${statusBadge}</td>
+                            <td>${row.name}</td>
+                            <td>${row.status}</td>
                         </tr>
                     `;
                 });
@@ -360,12 +355,10 @@ $(document).ready(function() {
                 data: { category_id: selectedCategory },
                 dataType: 'json',
                 success: function(response) {
-                    if(response.success) {
-                        $('#edit_category_id').val(response.id);
-                        $('#edit_category_name').val(response.name);
-                        $('#edit_active').val(response.active);
-                        $('#editModal').modal('show');
-                    }
+                    $('#edit_category_id').val(response.id);
+                    $('#edit_category_name').val(response.name);
+                    $('#edit_active').val(response.active);
+                    $('#editModal').modal('show');
                 }
             });
         }

@@ -61,7 +61,7 @@
                                             <?php endif; ?>
                                             <?php if(in_array('deleteBrand', $user_permission)): ?>
                                                 <li>
-                                                    <a class="dropdown-item delete-item" href="javascript:void(0);">
+                                                    <a class="dropdown-item delete-item text-danger" href="javascript:void(0);">
                                                         <i class="ti ti-trash me-2"></i> Delete
                                                     </a>
                                                 </li>
@@ -105,7 +105,6 @@
             </div>
         </div>
     </div>
-</div>
 
 <!-- Add Brand Modal -->
 <div id="addBrandModal" class="modal fade" tabindex="-1" role="dialog">
@@ -222,10 +221,10 @@ function loadBrandTable(page = 1, search = '') {
                     tableHtml += `
                         <tr>
                             <td class="ps-3">
-                                <input type="checkbox" class="form-check-input brand-check" value="${row[0]}">
+                                <input type="checkbox" class="form-check-input brand-check" value="${row.id}">
                             </td>
-                            <td>${row[0]}</td>
-                            <td>${row[1].replace('label-success', 'badge bg-success')}</td>
+                            <td>${row.name}</td>
+                            <td>${row.status}</td>
                         </tr>
                     `;
                 });

@@ -10,7 +10,7 @@
 
                 <span class="logo-dark">
                     <span class="logo-lg"><img src="<?php echo base_url()?>assets/images/logo-dark.png" alt="dark logo"></span>
-                    <span class="logo-sm text-center"><img src="assets/images/logo-sm.png" alt="small logo"></span>
+                    <span class="logo-sm text-center"><img src="<?php echo base_url()?>assets/images/logo-sm.png" alt="small logo"></span>
                 </span>
             </a>
             <button class="button-sm-hover">
@@ -123,7 +123,7 @@
                                         <?php if (in_array('createUser', $user_permission)): ?>
                                             <li class="side-nav-item">
                                                 <a href="<?php echo base_url("/users/create") ?>" class="side-nav-link">
-                                                    <span class="menu-text">Add New User</span>
+                                                    <span class="menu-text">Create New User</span>
                                                 </a>
                                             </li>
                                         <?php endif; ?>
@@ -177,6 +177,13 @@
                         </a>
                     </li>
                     <?php endif; ?>
+                    
+                    <li class="side-nav-item">
+                        <a href="<?php echo base_url('activity-log') ?>" class="side-nav-link">
+                            <span class="menu-icon"><i class="ti ti-logs"></i></span>
+                            <span class="menu-text"> Activity Logs </span>
+                        </a>
+                    </li>
                     
                     <?php if(in_array('viewProfile', $user_permission) || in_array('updateSetting', $user_permission)): ?>
                     <li class="side-nav-title mt-2">My Account</li>

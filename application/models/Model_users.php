@@ -23,23 +23,13 @@ class Model_users extends CI_Model
     public function getUserGroup($userId = null) 
     {
         if ($userId) {
-            $sql = "SELECT * FROM user_group WHERE user_id = ?";
+            $sql = "SELECT ug.group_id, g.group_name 
+                    FROM user_group ug 
+                    JOIN groups g ON ug.group_id = g.id 
+                    WHERE ug.user_id = ?";
             $query = $this->db->query($sql, array($userId));
-            $result = $query->row_array();
-
-            if (!$result) {
-                return null; 
-            }
-
-            $group_id = $result['group_id'];
-
-            $g_sql = "SELECT * FROM groups WHERE id = ?";
-            $g_query = $this->db->query($g_sql, array($group_id));
-            $q_result = $g_query->row_array();
-
-            return $q_result ?: null; 
+            return $query->row_array();
         }
-
         return null;
     }
 
@@ -93,4 +83,53 @@ class Model_users extends CI_Model
 		return $query->num_rows();
 	}
 	
+	/**
+	 * Get user data with pagination and search support
+	 */
+	public function getUserDataWithPagination($limit = 10, $offset = 0, $search = '')
+	{
+		// Skip admin user (ID = 1)
+		$this->db->where('id !=', 1);
+		
+		// Apply search if provided
+		if (!empty($search)) {
+			$this->db->group_start();
+			$this->db->like('username', $search);
+			$this->db->or_like('email', $search);
+			$this->db->or_like('firstname', $search);
+			$this->db->or_like('lastname', $search);
+			$this->db->or_like('phone', $search);
+			$this->db->group_end();
+		}
+		
+		// Apply pagination
+		$this->db->limit($limit, $offset);
+		$this->db->order_by('id', 'DESC');
+		
+		$query = $this->db->get('users');
+		return $query->result_array();
+	}
+	
+	/**
+	 * Get total number of users (for pagination)
+	 */
+	public function getTotalUsers($search = '')
+	{
+		// Skip admin user (ID = 1)
+		$this->db->where('id !=', 1);
+		
+		// Apply search if provided
+		if (!empty($search)) {
+			$this->db->group_start();
+			$this->db->like('username', $search);
+			$this->db->or_like('email', $search);
+			$this->db->or_like('firstname', $search);
+			$this->db->or_like('lastname', $search);
+			$this->db->or_like('phone', $search);
+			$this->db->group_end();
+		}
+		
+		$query = $this->db->get('users');
+		return $query->num_rows();
+	}
 }

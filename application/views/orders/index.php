@@ -62,7 +62,7 @@
                                         <?php endif; ?>
                                         <?php if(in_array('deleteOrder', $user_permission)): ?>
                                             <li>
-                                                <a class="dropdown-item d-flex align-items-center" href="#" onclick="removeSelectedOrders(); return false;">
+                                                <a class="dropdown-item d-flex align-items-center text-danger" href="#" onclick="removeSelectedOrders(); return false;">
                                                     <i class="ti ti-trash me-2"></i> Delete
                                                 </a>
                                             </li>
@@ -107,7 +107,6 @@
             </div>
         </div>
     </div>
-</div>
 
 <?php if(in_array('deleteOrder', $user_permission)): ?>
 <!-- remove order modal -->

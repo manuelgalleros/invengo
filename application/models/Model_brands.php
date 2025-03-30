@@ -15,6 +15,14 @@ class Model_brands extends CI_Model
 		return $query->result_array();
 	}
 
+	/*get the active brands data with full details*/
+	public function getActiveBrandsData()
+	{
+		$sql = "SELECT * FROM brands WHERE active = ?";
+		$query = $this->db->query($sql, array(1));
+		return $query->result_array();
+	}
+
 	/* get the brand data */
 	public function getBrandData($id = null, $page = 1, $per_page = 10, $search = '')
 	{
@@ -82,7 +90,12 @@ class Model_brands extends CI_Model
 	public function remove($id)
 	{
 		if($id) {
-			$this->db->where('id', $id);
+			// Check if $id is an array for multiple deletion
+			if(is_array($id)) {
+				$this->db->where_in('id', $id);
+			} else {
+				$this->db->where('id', $id);
+			}
 			$delete = $this->db->delete('brands');
 			return ($delete == true) ? true : false;
 		}

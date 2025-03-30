@@ -8,7 +8,7 @@ class Users extends Admin_Controller
 
 		$this->not_logged_in();
 		
-		$this->data['page_title'] = 'Users';
+		$this->data['page_title'] = 'Manage Users';
 		
 
 		$this->load->model('model_users');
@@ -33,7 +33,13 @@ class Users extends Admin_Controller
 			$result[$k]['user_group'] = $group;
 		}
 
-		$this->data['user_data'] = $result;
+		$this->data['all_users'] = $result;
+		$user_id = $this->session->userdata('id');
+        $this->data['user_data'] = $this->model_users->getUserData($user_id);
+        
+        // Add group data for the select dropdowns
+        $group_data = $this->model_groups->getGroupData();
+        $this->data['group_data'] = $group_data;
 
 		$this->render_template('users/index', $this->data);
 	}
@@ -41,9 +47,13 @@ class Users extends Admin_Controller
 	public function create()
 	{
 		if(!in_array('createUser', $this->permission)) {
+            if($this->input->is_ajax_request()) {
+                echo json_encode(['success' => false, 'errors' => 'Permission denied']);
+                return;
+            }
 			redirect('dashboard', 'refresh');
 		}
-
+		
 		$this->form_validation->set_rules('groups', 'Group', 'required');
 		$this->form_validation->set_rules('username', 'Username', 'trim|required|min_length[5]|max_length[12]|is_unique[users.username]');
 		$this->form_validation->set_rules('email', 'Email', 'trim|required|is_unique[users.email]');
@@ -54,6 +64,44 @@ class Users extends Admin_Controller
         if ($this->form_validation->run() == TRUE) {
             // true case
             $password = $this->password_hash($this->input->post('password'));
+            
+            // Handle image upload
+            $profile_image = 'default.jpg'; // Default image
+            if(!empty($_FILES['profile_image']['name'])) {
+                // Get file extension
+                $file_ext = pathinfo($_FILES['profile_image']['name'], PATHINFO_EXTENSION);
+                
+                // Create unique filename using username and timestamp
+                $unique_filename = 'user_' . 
+                                 preg_replace('/[^A-Za-z0-9]/', '', $this->input->post('username')) . 
+                                 '_' . 
+                                 time() . 
+                                 '_' . 
+                                 uniqid() . 
+                                 '.' . $file_ext;
+                
+                // Set upload configuration
+                $config['upload_path'] = './assets/images/users/';
+                $config['allowed_types'] = 'gif|jpg|jpeg|png';
+                $config['max_size'] = 10240; // 10MB max-size
+                $config['file_name'] = $unique_filename;
+                
+                $this->load->library('upload', $config);
+                
+                if($this->upload->do_upload('profile_image')) {
+                    $upload_data = $this->upload->data();
+                    $profile_image = $upload_data['file_name'];
+                } else {
+                    if($this->input->is_ajax_request()) {
+                        echo json_encode(['success' => false, 'errors' => $this->upload->display_errors()]);
+                        return;
+                    }
+                    $this->session->set_flashdata('error', $this->upload->display_errors());
+                    redirect('users/create', 'refresh');
+                    return;
+                }
+            }
+            
         	$data = array(
         		'username' => $this->input->post('username'),
         		'password' => $password,
@@ -62,27 +110,62 @@ class Users extends Admin_Controller
         		'lastname' => $this->input->post('lname'),
         		'phone' => $this->input->post('phone'),
         		'gender' => $this->input->post('gender'),
+                'profile_image' => $profile_image
         	);
 
         	$create = $this->model_users->create($data, $this->input->post('groups'));
         	if($create == true) {
+                if($this->input->is_ajax_request()) {
+                    echo json_encode([
+                        'success' => true, 
+                        'message' => 'Successfully created user "' . $this->input->post('username') . '"',
+                        'redirect' => base_url('users/')
+                    ]);
+                    return;
+                }
         		$this->session->set_flashdata('success', 'Successfully created');
         		redirect('users/', 'refresh');
         	}
         	else {
-        		$this->session->set_flashdata('errors', 'Error occurred!!');
+        		// If user creation fails, delete the uploaded image
+                if($profile_image != 'default.jpg') {
+                    unlink('./assets/images/users/' . $profile_image);
+                }
+                if($this->input->is_ajax_request()) {
+                    echo json_encode(['success' => false, 'errors' => 'Error occurred while creating user']);
+                    return;
+                }
+        		$this->session->set_flashdata('error', 'Error occurred!!');
         		redirect('users/create', 'refresh');
         	}
         }
         else {
-            // false case
+            // false case - validation failed
+            if($this->input->is_ajax_request()) {
+                // Get all validation errors
+                $errors = array();
+                
+                // Add form validation errors
+                if(form_error('groups')) $errors[] = strip_tags(form_error('groups'));
+                if(form_error('username')) $errors[] = strip_tags(form_error('username'));
+                if(form_error('email')) $errors[] = strip_tags(form_error('email'));
+                if(form_error('password')) $errors[] = strip_tags(form_error('password'));
+                if(form_error('cpassword')) $errors[] = strip_tags(form_error('cpassword'));
+                if(form_error('fname')) $errors[] = strip_tags(form_error('fname'));
+                
+                echo json_encode(['success' => false, 'errors' => $errors]);
+                return;
+            }
+            
+            // Regular form submission
+			$this->data['page_title'] = 'Create New User';
         	$group_data = $this->model_groups->getGroupData();
         	$this->data['group_data'] = $group_data;
+			$user_id = $this->session->userdata('id');
+			$this->data['user_data'] = $this->model_users->getUserData($user_id);
 
             $this->render_template('users/create', $this->data);
-        }	
-
-		
+        }
 	}
 
 	public function password_hash($pass = '')
@@ -96,15 +179,38 @@ class Users extends Admin_Controller
 	public function edit($id = null)
 	{
 		if(!in_array('updateUser', $this->permission)) {
+			if($this->input->is_ajax_request()) {
+				echo json_encode(['success' => false, 'errors' => 'Permission denied']);
+				return;
+			}
 			redirect('dashboard', 'refresh');
 		}
 
 		if($id) {
+			// Handle GET request for fetching user data
+			if($this->input->server('REQUEST_METHOD') === 'GET') {
+				if($this->input->is_ajax_request()) {
+					$user_data = $this->model_users->getUserData($id);
+					$groups = $this->model_users->getUserGroup($id);
+					
+					if($user_data && $groups) {
+						// Merge user data with group info
+						$response = array_merge($user_data, [
+							'group_id' => $groups['group_id'],
+							'group_name' => $groups['group_name']
+						]);
+						echo json_encode($response);
+					} else {
+						echo json_encode(['success' => false, 'errors' => 'User not found']);
+					}
+					return;
+				}
+			}
+
 			$this->form_validation->set_rules('groups', 'Group', 'required');
 			$this->form_validation->set_rules('username', 'Username', 'trim|required|min_length[5]|max_length[12]');
 			$this->form_validation->set_rules('email', 'Email', 'trim|required');
 			$this->form_validation->set_rules('fname', 'First name', 'trim|required');
-
 
 			if ($this->form_validation->run() == TRUE) {
 	            // true case
@@ -118,12 +224,68 @@ class Users extends Admin_Controller
 		        		'gender' => $this->input->post('gender'),
 		        	);
 
+                    // Handle profile image upload
+                    if(!empty($_FILES['profile_image']['name'])) {
+                        // Get user's current image
+                        $user_data = $this->model_users->getUserData($id);
+                        $current_image = $user_data['profile_image'];
+                        
+                        // Get file extension
+                        $file_ext = pathinfo($_FILES['profile_image']['name'], PATHINFO_EXTENSION);
+                        
+                        // Create unique filename using username and timestamp
+                        $unique_filename = 'user_' . 
+                                        preg_replace('/[^A-Za-z0-9]/', '', $this->input->post('username')) . 
+                                        '_' . 
+                                        time() . 
+                                        '_' . 
+                                        uniqid() . 
+                                        '.' . $file_ext;
+                        
+                        // Set upload configuration
+                        $config['upload_path'] = './assets/images/users/';
+                        $config['allowed_types'] = 'gif|jpg|jpeg|png';
+                        $config['max_size'] = 10240; // 10MB max-size
+                        $config['file_name'] = $unique_filename;
+                        
+                        $this->load->library('upload', $config);
+                        
+                        if($this->upload->do_upload('profile_image')) {
+                            $upload_data = $this->upload->data();
+                            $data['profile_image'] = $upload_data['file_name'];
+                            
+                            // Delete old image if it's not the default
+                            if($current_image != 'default.jpg' && file_exists('./assets/images/users/' . $current_image)) {
+                                unlink('./assets/images/users/' . $current_image);
+                            }
+                        } else {
+                            if($this->input->is_ajax_request()) {
+                                echo json_encode(['success' => false, 'errors' => $this->upload->display_errors()]);
+                                return;
+                            }
+                            $this->session->set_flashdata('error', $this->upload->display_errors());
+                            redirect('users/edit/'.$id, 'refresh');
+                            return;
+                        }
+                    }
+
 		        	$update = $this->model_users->edit($data, $id, $this->input->post('groups'));
 		        	if($update == true) {
-		        		$this->session->set_flashdata('success', 'Successfully created');
+		        		if($this->input->is_ajax_request()) {
+							echo json_encode([
+								'success' => true,
+								'message' => 'Successfully updated user "' . $this->input->post('username') . '"'
+							]);
+							return;
+						}
+		        		$this->session->set_flashdata('success', 'Successfully updated');
 		        		redirect('users/', 'refresh');
 		        	}
 		        	else {
+		        		if($this->input->is_ajax_request()) {
+							echo json_encode(['success' => false, 'errors' => 'Error occurred while updating user']);
+							return;
+						}
 		        		$this->session->set_flashdata('errors', 'Error occurred!!');
 		        		redirect('users/edit/'.$id, 'refresh');
 		        	}
@@ -146,18 +308,86 @@ class Users extends Admin_Controller
 			        		'gender' => $this->input->post('gender'),
 			        	);
 
+                        // Handle profile image upload
+                        if(!empty($_FILES['profile_image']['name'])) {
+                            // Get user's current image
+                            $user_data = $this->model_users->getUserData($id);
+                            $current_image = $user_data['profile_image'];
+                            
+                            // Get file extension
+                            $file_ext = pathinfo($_FILES['profile_image']['name'], PATHINFO_EXTENSION);
+                            
+                            // Create unique filename using username and timestamp
+                            $unique_filename = 'user_' . 
+                                            preg_replace('/[^A-Za-z0-9]/', '', $this->input->post('username')) . 
+                                            '_' . 
+                                            time() . 
+                                            '_' . 
+                                            uniqid() . 
+                                            '.' . $file_ext;
+                            
+                            // Set upload configuration
+                            $config['upload_path'] = './assets/images/users/';
+                            $config['allowed_types'] = 'gif|jpg|jpeg|png';
+                            $config['max_size'] = 10240; // 10MB max-size
+                            $config['file_name'] = $unique_filename;
+                            
+                            $this->load->library('upload', $config);
+                            
+                            if($this->upload->do_upload('profile_image')) {
+                                $upload_data = $this->upload->data();
+                                $data['profile_image'] = $upload_data['file_name'];
+                                
+                                // Delete old image if it's not the default
+                                if($current_image != 'default.jpg' && file_exists('./assets/images/users/' . $current_image)) {
+                                    unlink('./assets/images/users/' . $current_image);
+                                }
+                            } else {
+                                if($this->input->is_ajax_request()) {
+                                    echo json_encode(['success' => false, 'errors' => $this->upload->display_errors()]);
+                                    return;
+                                }
+                                $this->session->set_flashdata('error', $this->upload->display_errors());
+                                redirect('users/edit/'.$id, 'refresh');
+                                return;
+                            }
+                        }
+
 			        	$update = $this->model_users->edit($data, $id, $this->input->post('groups'));
 			        	if($update == true) {
+			        		if($this->input->is_ajax_request()) {
+								echo json_encode([
+									'success' => true,
+									'message' => 'Successfully updated user "' . $this->input->post('username') . '"'
+								]);
+								return;
+							}
 			        		$this->session->set_flashdata('success', 'Successfully updated');
 			        		redirect('users/', 'refresh');
 			        	}
 			        	else {
+			        		if($this->input->is_ajax_request()) {
+								echo json_encode(['success' => false, 'errors' => 'Error occurred while updating user']);
+								return;
+							}
 			        		$this->session->set_flashdata('errors', 'Error occurred!!');
 			        		redirect('users/edit/'.$id, 'refresh');
 			        	}
 					}
 			        else {
-			            // false case
+			            // false case - validation failed
+						if($this->input->is_ajax_request()) {
+							// Get all validation errors
+							$errors = array();
+							
+							// Add form validation errors
+							if(form_error('password')) $errors[] = strip_tags(form_error('password'));
+							if(form_error('cpassword')) $errors[] = strip_tags(form_error('cpassword'));
+							
+							echo json_encode(['success' => false, 'errors' => $errors]);
+							return;
+						}
+
 			        	$user_data = $this->model_users->getUserData($id);
 			        	$groups = $this->model_users->getUserGroup($id);
 
@@ -173,7 +403,21 @@ class Users extends Admin_Controller
 		        }
 	        }
 	        else {
-	            // false case
+	            // false case - validation failed
+				if($this->input->is_ajax_request()) {
+					// Get all validation errors
+					$errors = array();
+					
+					// Add form validation errors
+					if(form_error('groups')) $errors[] = strip_tags(form_error('groups'));
+					if(form_error('username')) $errors[] = strip_tags(form_error('username'));
+					if(form_error('email')) $errors[] = strip_tags(form_error('email'));
+					if(form_error('fname')) $errors[] = strip_tags(form_error('fname'));
+					
+					echo json_encode(['success' => false, 'errors' => $errors]);
+					return;
+				}
+
 	        	$user_data = $this->model_users->getUserData($id);
 	        	$groups = $this->model_users->getUserGroup($id);
 
@@ -212,6 +456,45 @@ class Users extends Admin_Controller
 				$this->render_template('users/delete', $this->data);
 			}	
 		}
+	}
+
+	public function getUsers()
+	{
+		// Check for permission
+		if(!in_array('viewUser', $this->permission)) {
+			$this->output->set_status_header(403);
+			echo json_encode(['error' => 'Permission denied']);
+			return;
+		}
+
+		// Get parameters
+		$page = $this->input->get('page') ? (int)$this->input->get('page') : 1;
+		$search = $this->input->get('search') ? $this->input->get('search') : '';
+		$limit = 10;
+		$offset = ($page - 1) * $limit;
+
+		// Get user data with search and pagination
+		$user_data = $this->model_users->getUserDataWithPagination($limit, $offset, $search);
+		$total_users = $this->model_users->getTotalUsers($search);
+
+		// Process user data to include group information
+		$result = [];
+		foreach ($user_data as $k => $v) {
+			$group = $this->model_users->getUserGroup($v['id']);
+			$v['group_name'] = $group['group_name'];
+			$result[] = $v;
+		}
+
+		// Prepare response
+		$response = [
+			'users' => $result,
+			'total_users' => $total_users,
+			'page' => $page,
+			'limit' => $limit
+		];
+
+		header('Content-Type: application/json');
+		echo json_encode($response);
 	}
 
 	public function profile()

@@ -14,6 +14,7 @@
     <link href="<?php echo base_url()?>assets/css/icons.min.css" rel="stylesheet" type="text/css" />
     <link href="<?php echo base_url()?>assets/vendor/quill/quill.core.css" rel="stylesheet" type="text/css" />
     <link href="<?php echo base_url()?>assets/vendor/quill/quill.snow.css" rel="stylesheet" type="text/css" />
+    <script src="<?php echo base_url()?>assets/vendor/dropzone/dropzone-min.js"></script>
 
     <!-- jQuery -->
     <script src="<?php echo base_url()?>assets/js/vendor.min.js"></script>

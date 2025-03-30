@@ -204,7 +204,7 @@
                     <div class="topbar-item">
                         <div class="dropdown">
                             <a class="topbar-link btn btn-outline-primary dropdown-toggle drop-arrow-none" style="--bs-btn-hover-bg: var(--bs-info);--bs-btn-hover-border-color: var(--bs-info);--bs-btn-active-bg: var(--bs-info);--bs-btn-active-border-color: var(--bs-info);--bs-btn-disabled-color: var(--bs-info);" data-bs-toggle="dropdown" data-bs-offset="0,22" type="button" aria-haspopup="false" aria-expanded="false">
-                                <img src="<?php echo base_url(); ?>assets/images/users/avatar-1.jpg" width="24" class="rounded-circle me-lg-2 d-flex" alt="user-image">
+                                <img src="<?php echo base_url('assets/images/users/' . ($user_data['profile_image'] ? $user_data['profile_image'] : 'default.jpg')); ?>" width="24" class="rounded-circle me-lg-2 d-flex" alt="user-image">
                                 <span class="d-lg-flex flex-column gap-1 d-none">
                                     <?php echo $user_data['firstname']; ?>
                                 </span>

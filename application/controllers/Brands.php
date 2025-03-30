@@ -10,7 +10,7 @@ class Brands extends Admin_Controller
 
 		$this->not_logged_in();
 
-		$this->data['page_title'] = 'Brands';
+		$this->data['page_title'] = 'Manage Brands';
         $this->load->model('model_users');
 		$this->load->model('model_brands');
 	}
@@ -31,7 +31,7 @@ class Brands extends Admin_Controller
 
 		$this->data['results'] = $result;
 
-		$this->render_template('brands/index', $this->data);
+		$this->render_template('brand/index', $this->data);
 	}
 
 	/*
@@ -55,11 +55,13 @@ class Brands extends Admin_Controller
 		);
 
 		foreach ($brands as $key => $value) {
-			$status = ($value['active'] == 1) ? '<span class="badge badge-outline-success">Active</span>' : '<span class="badge badge-outline-danger">Inactive</span>';
+			$status = ($value['active'] == 1) ? '<span class="badge bg-success">Active</span>' : '<span class="badge bg-danger">Inactive</span>';
 			
 			$response['data'][$key] = array(
-				$value['name'],
-				$status
+				'id' => $value['id'],
+				'name' => $value['name'],
+				'active' => $value['active'],
+				'status' => $status
 			);
 		}
 
@@ -72,14 +74,14 @@ class Brands extends Admin_Controller
 	* returns the data into json format. 
 	* This function is invoked from the view page.
 	*/
-	public function fetchBrandDataById($id)
+	public function fetchBrandDataById()
 	{
-		if($id) {
-			$data = $this->model_brands->getBrandData($id);
+		$brand_id = $this->input->post('brand_id');
+		
+		if($brand_id) {
+			$data = $this->model_brands->getBrandData($brand_id);
 			echo json_encode($data);
 		}
-
-		return false;
 	}
 
 	/*
@@ -133,34 +135,38 @@ class Brands extends Admin_Controller
 	* and if the validation is successfully then it updates the data into the database 
 	* and returns the json format operation messages
 	*/
-	public function update($id)
+	public function update()
 	{
 		if(!in_array('updateBrand', $this->permission)) {
 			redirect('dashboard', 'refresh');
 		}
 
 		$response = array();
+		$brand_id = $this->input->post('brand_id');
 
-		if($id) {
-			$this->form_validation->set_rules('edit_brand_name', 'Brand name', 'trim|required');
-			$this->form_validation->set_rules('edit_active', 'Active', 'trim|required');
+		if($brand_id) {
+			$this->form_validation->set_rules('brand_name', 'Brand name', 'trim|required');
+			$this->form_validation->set_rules('active', 'Active', 'trim|required');
 
 			$this->form_validation->set_error_delimiters('<p class="text-danger">','</p>');
 
 	        if ($this->form_validation->run() == TRUE) {
+                // Get brand name
+                $brand_name = $this->input->post('brand_name');
+                
 	        	$data = array(
-	        		'name' => $this->input->post('edit_brand_name'),
-	        		'active' => $this->input->post('edit_active'),	
+	        		'name' => $brand_name,
+	        		'active' => $this->input->post('active'),	
 	        	);
 
-	        	$update = $this->model_brands->update($data, $id);
+	        	$update = $this->model_brands->update($data, $brand_id);
 	        	if($update == true) {
 	        		$response['success'] = true;
-	        		$response['messages'] = 'Succesfully updated';
+	        		$response['messages'] = "Brand '" . $brand_name . "' successfully updated";
 	        	}
 	        	else {
 	        		$response['success'] = false;
-	        		$response['messages'] = 'Error in the database while updated the brand information';			
+	        		$response['messages'] = 'Error in the database while updating the brand information';			
 	        	}
 	        }
 	        else {
@@ -191,11 +197,32 @@ class Brands extends Admin_Controller
 		$brand_id = $this->input->post('brand_id');
 		$response = array();
 		if($brand_id) {
+			// Get brand name(s) before deletion
+			$brand_names = [];
+			if(is_array($brand_id)) {
+				foreach($brand_id as $id) {
+					$brand_data = $this->model_brands->getBrandData($id);
+					if($brand_data) {
+						$brand_names[] = $brand_data['name'];
+					}
+				}
+			} else {
+				$brand_data = $this->model_brands->getBrandData($brand_id);
+				if($brand_data) {
+					$brand_names[] = $brand_data['name'];
+				}
+			}
+			
+			// Delete the brand(s)
 			$delete = $this->model_brands->remove($brand_id);
 
 			if($delete == true) {
 				$response['success'] = true;
-				$response['messages'] = "Successfully removed";	
+				if(count($brand_names) == 1) {
+					$response['messages'] = "Brand '" . $brand_names[0] . "' successfully removed";
+				} else {
+					$response['messages'] = count($brand_names) . " brands successfully removed: " . implode(", ", $brand_names);
+				}
 			}
 			else {
 				$response['success'] = false;
@@ -204,7 +231,7 @@ class Brands extends Admin_Controller
 		}
 		else {
 			$response['success'] = false;
-			$response['messages'] = "Refersh the page again!!";
+			$response['messages'] = "Refresh the page again!!";
 		}
 
 		echo json_encode($response);

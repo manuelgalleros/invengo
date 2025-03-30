@@ -16,21 +16,6 @@
             <div class="col-12">
                 <div id="messages"></div>
 
-                <!-- Success/Error Messages -->
-<!--
-                <?php if($this->session->flashdata('success')): ?>
-                    <div class="alert alert-success alert-dismissible fade show" role="alert">
-                        <?php echo $this->session->flashdata('success'); ?>
-                        <button type="button" class="close" data-dismiss="alert">&times;</button>
-                    </div>
-                <?php elseif($this->session->flashdata('error')): ?>
-                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                        <?php echo $this->session->flashdata('error'); ?>
-                        <button type="button" class="close" data-dismiss="alert">&times;</button>
-                    </div>
-                <?php endif; ?>
--->
-
                 <div class="card">
                     <div class="card-header border-bottom">
                         <div class="d-flex flex-wrap justify-content-between gap-2">
@@ -44,7 +29,7 @@
                                 <?php endif; ?>
                                 <?php if(in_array('createProduct', $user_permission)): ?>
                                     <button type="button" data-bs-toggle="modal" data-bs-target="#addProductModal" class="btn btn-soft-info"><i class="ti ti-plus me-1"></i> Add Product</button>
-                                <button type="button" class="btn btn-soft-primary btn-icon"><i class="ti ti-upload fs-20"></i> </button>
+                                <button type="button" data-bs-toggle="modal" data-bs-target="#importModal" class="btn btn-soft-primary btn-icon"><i class="ti ti-upload fs-20"></i></button>
                                 <?php endif; ?>
                                 <?php if(in_array('updateProduct', $user_permission) || in_array('deleteProduct', $user_permission)): ?>
                                 <button type="button" class="btn btn-danger dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" id="actionsBtn" style="display: none"><i class="ti ti-settings me-1"></i> Actions <span class="caret"></span></button>
@@ -53,7 +38,7 @@
                                      <a class="dropdown-item edit-item" href="#"><i class="ti ti-edit"></i> &nbsp;Edit</a>
                                     <?php endif; ?>
                                     <?php if(in_array('deleteProduct', $user_permission)): ?>
-                                    <a class="dropdown-item" href="#"><i class="ti ti-trash"></i> &nbsp;Delete</a>
+                                    <a class="dropdown-item text-danger" href="#"><i class="ti ti-trash"></i> &nbsp;Delete</a>
                                     <?php endif; ?>
                                  </div>
                                 <?php endif; ?>
@@ -212,12 +197,15 @@
                         </div>
                     </div>
 
+                    </form>
+                    
+                </div>
+                                <div class="modal-footer">
                      <div class="d-flex justify-content-end gap-2">
                                     <button type="button" data-bs-dismiss="modal" class="btn btn-danger">Cancel</button>
                                     <button type="submit" class="btn btn-info" id="addProductBtn">Add New Product</button>
                                 </div>
-                    </form>
-                </div>
+                                </div>
         </div>
     </div>
 </div>
@@ -370,6 +358,72 @@
 
     <!-- /.modal -->
   
+    <!-- Import Products Modal -->
+    <div id="importModal" class="modal fade" tabindex="-1" aria-labelledby="importModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 class="modal-title" id="importModalLabel">Import Products</h4>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info text-bg-light d-flex align-items-center text-wrap mb-4" role="alert">
+                        <div>
+                            Upload Excel file (.xlsx) containing product details.<br>
+                            Required columns:<br>
+                            Product Name, SKU, Description, Barcode, Category, Brand, Price, Quantity, Availability
+                            <hr>
+                            <small><strong>Note:</strong> If a category or brand doesn't exist, it will be automatically created.</small>
+                        </div>
+                    </div>
+
+                    
+                    <form id="importForm" action="<?php echo base_url('products/import'); ?>" method="POST" class="dropzone dz-clickable" data-plugin="dropzone" data-previews-container="#file-previews" data-upload-preview-template="#uploadPreviewTemplate">
+                    <div class="dz-message needsclick">
+                                            <i class="h1 ti ti-cloud-upload mb-4"></i>
+                                            <h4>Drop files here or click to upload.</h4>
+                                            <span class="text-muted fs-13">(This is just a demo dropzone. Selected files are <strong>not</strong> actually uploaded.)</span>
+                                        </div>
+                    </form>
+                    
+                    <!-- Preview section for uploaded files -->
+                    <div class="mt-3">
+                        <div id="file-previews" class="dropzone-previews mt-2"></div>
+                    </div>
+                    
+                    <!-- Template for file previews (hidden) -->
+                    <div class="d-none" id="uploadPreviewTemplate">
+                        <div class="card mt-1 mb-0 shadow-none border">
+                            <div class="p-2">
+                                <div class="row align-items-center">
+                                    <div class="col-auto">
+                                        <!-- Excel icon instead of image thumbnail -->
+                                        <div class="avatar-sm rounded bg-light d-flex align-items-center justify-content-center">
+                                            <i class="ti ti-file-spreadsheet text-primary fs-20"></i>
+                                        </div>
+                                    </div>
+                                    <div class="col ps-0">
+                                        <a href="javascript:void(0);" class="text-muted fw-bold" data-dz-name></a>
+                                        <p class="mb-0" data-dz-size></p>
+                                    </div>
+                                    <div class="col-auto">
+                                        <!-- Button -->
+                                        <a href="" class="btn btn-link btn-lg text-muted" data-dz-remove>
+                                            <i class="ti ti-x"></i>
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" id="submitImport" class="btn btn-info" disabled>Import Products</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 <script>
 // Function to auto-dismiss messages
 function autoDismissMessages() {
@@ -419,6 +473,9 @@ function loadProductTable(page = 1, search = '') {
     });
 }
 
+// Disable Dropzone auto discovery globally
+Dropzone.autoDiscover = false;
+
 $(document).ready(function () {
     // Initialize Select2
     $('#category, #brand, #availability').select2({
@@ -429,6 +486,159 @@ $(document).ready(function () {
     $('#edit_category, #edit_brand, #edit_availability').select2({
         dropdownParent: $('#editProductModal .modal-content')
     });
+
+    // Initialize Dropzone only if the form exists
+    if ($("#importForm").length) {
+        // Remove any existing dropzone instances
+        if (typeof importDropzone !== 'undefined') {
+            importDropzone.destroy();
+        }
+        
+        // Create new dropzone instance
+        var importDropzone = new Dropzone("#importForm", {
+            url: "<?php echo base_url('products/import'); ?>",
+            acceptedFiles: ".xlsx",
+            maxFiles: 1,
+            autoProcessQueue: false, // Prevent auto upload
+            dictDefaultMessage: "Drop Excel file here or click to upload",
+            dictFileTooBig: "File is too big ({{filesize}}MB). Max filesize: {{maxFilesize}}MB.",
+            dictInvalidFileType: "You can't upload files of this type.",
+            dictResponseError: "Server responded with {{statusCode}} code.",
+            dictCancelUpload: "Upload cancelled.",
+            dictUploadCanceled: "Upload cancelled.",
+            dictMaxFilesExceeded: "You can not upload any more files.",
+            previewsContainer: "#file-previews",
+            previewTemplate: document.querySelector('#uploadPreviewTemplate').innerHTML,
+            init: function() {
+                var myDropzone = this;
+                
+                // Handle file add event
+                this.on("addedfile", function(file) {
+                    // Enable the import button when a file is added
+                    $("#submitImport").prop("disabled", false);
+                });
+                
+                // Handle file remove event
+                this.on("removedfile", function(file) {
+                    // Disable the import button when no files are present
+                    if (this.files.length === 0) {
+                        $("#submitImport").prop("disabled", true);
+                    }
+                });
+                
+                // Handle max files exceeded
+                this.on("maxfilesexceeded", function(file) {
+                    this.removeAllFiles();
+                    this.addFile(file);
+                });
+                
+                // Set up submit button
+                $("#submitImport").click(function() {
+                    if (myDropzone.files.length > 0) {
+                        // Process the queue when the button is clicked
+                        myDropzone.processQueue();
+                    }
+                });
+                
+                // Handle success
+                this.on("success", function(file, response) {
+                    // Check if response is a valid JSON string
+                    try {
+                        var data = typeof response === 'string' ? JSON.parse(response) : response;
+
+                        if (data.success) {
+                            var message = "Products imported successfully.";
+                            if (data.errors && data.errors.length > 0) {
+                                message = data.message + "<br><small>Some items encountered errors. Check console for details.</small>";
+                                // Log errors to console for reference
+                                console.log("Import errors:", data.errors);
+                            }
+                        
+                            $('#messages').html(`
+                                <div class="alert alert-success text-bg-success alert-dismissible d-flex align-items-center" role="alert">
+                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+                                    <iconify-icon icon="solar:check-read-line-duotone" class="fs-20 me-1"></iconify-icon>
+                                    <div class="lh-1">${message}</div>
+                                </div>
+                            `);
+                            
+                            $('#importModal').modal('hide');
+                            loadProductTable(); // Reload the product table
+                            
+                            // Clear the dropzone for next import
+                            myDropzone.removeAllFiles();
+                        } else {
+                            // For complete failures
+                            var errorMsg = data.message || 'Import failed';
+                            var errorHtml = `
+                                <div class="alert alert-danger text-bg-danger alert-dismissible d-flex align-items-center" role="alert">
+                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+                                    <iconify-icon icon="solar:danger-triangle-bold-duotone" class="fs-20 me-1"></iconify-icon>
+                                    <div class="lh-1">${errorMsg}</div>
+                                </div>
+                            `;
+                            
+                            // If there are detailed errors, add them to the message
+                            if (data.errors && data.errors.length > 0) {
+                                var errorDetails = '<div class="mt-2"><ul class="mb-0">';
+                                // Show up to 3 errors in the message
+                                var displayErrors = data.errors.slice(0, 3);
+                                displayErrors.forEach(function(error) {
+                                    errorDetails += '<li>' + error + '</li>';
+                                });
+                                
+                                // If there are more errors, add a note
+                                if (data.errors.length > 3) {
+                                    errorDetails += '<li>And ' + (data.errors.length - 3) + ' more errors...</li>';
+                                    // Log all errors to console for reference
+                                    console.log("Import errors:", data.errors);
+                                }
+                                
+                                errorDetails += '</ul></div>';
+                                
+                                errorHtml = `
+                                    <div class="alert alert-danger text-bg-danger alert-dismissible" role="alert">
+                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+                                        <div class="d-flex align-items-center">
+                                            <iconify-icon icon="solar:danger-triangle-bold-duotone" class="fs-20 me-1"></iconify-icon>
+                                            <div class="lh-1">${errorMsg}</div>
+                                        </div>
+                                        ${errorDetails}
+                                    </div>
+                                `;
+                            }
+                            
+                            $('#messages').html(errorHtml);
+                            $('#importModal').modal('hide');
+                        }
+                        
+                        autoDismissMessages();
+                    } catch (e) {
+                        console.error("Error parsing response:", e);
+                        $('#messages').html(`
+                            <div class="alert alert-danger text-bg-danger alert-dismissible d-flex align-items-center" role="alert">
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+                                <iconify-icon icon="solar:danger-triangle-bold-duotone" class="fs-20 me-1"></iconify-icon>
+                                <div class="lh-1">Unexpected response format.</div>
+                            </div>
+                        `);
+                        autoDismissMessages();
+                    }
+                });
+                
+                this.on("error", function(file, errorMessage) {
+                    $('#messages').html(`
+                        <div class="alert alert-danger text-bg-danger alert-dismissible d-flex align-items-center" role="alert">
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+                            <iconify-icon icon="solar:danger-triangle-bold-duotone" class="fs-20 me-1"></iconify-icon>
+                            <div class="lh-1">Error uploading file: ${errorMessage}</div>
+                        </div>
+                    `);
+                    autoDismissMessages();
+                });
+            }
+        });
+    }
 
     // Reinitialize Select2 when edit modal is shown
     $('#editProductModal').on('shown.bs.modal', function () {
@@ -807,3 +1017,5 @@ function removeProduct(productId) {
     $('#removeModal').modal('show');
 }
 </script>
+
+
