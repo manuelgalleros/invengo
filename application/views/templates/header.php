@@ -25,6 +25,8 @@
     <!-- Toastr -->
     <script src="<?php echo base_url();?>assets/vendor/toastr/tata.js"></script>
 
+    <!-- Apex Chart js -->
+    <script src="<?php echo base_url();?>assets/vendor/apexcharts/apexcharts.min.js"></script>
 
     <script>
       var myVar = setInterval(function() {

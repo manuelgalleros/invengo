@@ -41,7 +41,7 @@
                                     <button type="button" class="btn btn-light" id="showOrdersBtn"><i class="ti ti-eye align-middle me-1 fs-18"></i> Show Orders</button>
                                 <?php endif; ?>
                                 <?php if(in_array('createOrder', $user_permission)): ?>
-                                    <a href="<?php echo base_url('orders/create') ?>" class="btn btn-soft-info"><i class="ti ti-plus me-1"></i> Add Order</a>
+                                    <a href="<?php echo base_url('orders/create') ?>" class="btn btn-soft-info"><i class="ti ti-plus me-1"></i> Create New Order</a>
                                 <?php endif; ?>
                                 <div class="dropdown order-actions" style="display: none !important;">
                                     <button type="button" class="btn btn-danger dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
@@ -79,11 +79,11 @@
                                 <tr>
                                     <th class="ps-3"><input type="checkbox" class="form-check-input" id="checkAll"></th>
                                     <th>Order No</th>
-                                    <th>Customer Name</th>
-                                    <th>Customer Phone</th>
                                     <th>Order Date & Time</th>
                                     <th>Total Products</th>
                                     <th>Total Amount</th>
+                                    <th>Payment Method</th>
+                                    <th>Processed By</th>
                                     <th>Status</th>
                                 </tr>
                             </thead>
@@ -145,22 +145,47 @@
                 <form id="editOrderForm">
                     <input type="hidden" id="edit_order_id" name="order_id">
                     <div class="row">
-                        <div class="col-md-6">
+                        <div class="col-md-12">
                             <div class="mb-3">
-                                <label for="edit_customer_name" class="form-label">Customer Name</label>
-                                <input type="text" class="form-control" id="edit_customer_name" name="customer_name">
+                                <label class="form-label">Payment Method</label>
+                                <div class="row">
+                                    <div class="col-md-6 mb-2">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="edit_payment_method" id="edit_paymentCash" value="Cash">
+                                            <label class="form-check-label" for="edit_paymentCash">Cash</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="edit_payment_method" id="edit_paymentCard" value="Card">
+                                            <label class="form-check-label" for="edit_paymentCard">Credit/Debit Card</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="edit_payment_method" id="edit_paymentBank" value="Bank">
+                                            <label class="form-check-label" for="edit_paymentBank">Bank Transfer</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="edit_payment_method" id="edit_paymentGcash" value="Gcash">
+                                            <label class="form-check-label" for="edit_paymentGcash">Gcash</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="edit_payment_method" id="edit_paymentPaymaya" value="Paymaya">
+                                            <label class="form-check-label" for="edit_paymentPaymaya">Paymaya</label>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="edit_customer_phone" class="form-label">Customer Phone</label>
-                                <input type="text" class="form-control" id="edit_customer_phone" name="customer_phone">
-                            </div>
-                        </div>
-                        <div class="col-md-6">
+                        <div class="col-md-12">
                             <div class="mb-3">
                                 <label for="edit_paid_status" class="form-label">Payment Status</label>
-                                <select class="form-select" id="edit_paid_status" name="paid_status">
+                                <select class="form-select" id="edit_paid_status" name="edit_paid_status">
                                     <option value="1">Paid</option>
                                     <option value="0">Unpaid</option>
                                 </select>
@@ -244,8 +269,15 @@ $(document).ready(function() {
                             let order = response.data;
                             // Populate the edit form with order data
                             $('#edit_order_id').val(order.id);
-                            $('#edit_customer_name').val(order.customer_name);
-                            $('#edit_customer_phone').val(order.customer_phone);
+                            
+                            // Reset all radio buttons
+                            $('input[name="edit_payment_method"]').prop('checked', false);
+                            
+                            // Check the appropriate payment method radio
+                            if(order.payment_method) {
+                                $(`#edit_payment${order.payment_method}`).prop('checked', true);
+                            }
+                            
                             $('#edit_paid_status').val(order.paid_status).trigger('change');
                             
                             // Show the edit modal
@@ -361,12 +393,14 @@ function loadOrderTable(page = 1, search = '') {
                 response.data.forEach(function(order) {
                     html += `<tr>
                         <td class="ps-3"><input type="checkbox" class="form-check-input order-check" value="${order.id}"></td>
-                        <td>${order.bill_no}</td>
-                        <td>${order.customer_name}</td>
-                        <td>${order.customer_phone}</td>
+                        <td>${order.order_no}</td>
                         <td>${order.date_time}</td>
                         <td>${order.total_products}</td>
                         <td>₱${parseFloat(order.net_amount).toFixed(2)}</td>
+                        <td>${order.payment_method ? 
+                          order.payment_method.charAt(0).toUpperCase() + order.payment_method.slice(1) : 
+                          'N/A'}</td>
+                        <td>${order.user_name ? order.user_name : 'N/A'}</td>
                         <td>
                             ${order.paid_status == 1 ? 
                                 '<span class="badge bg-success-subtle text-success">Paid</span>' : 
@@ -389,7 +423,7 @@ function loadOrderTable(page = 1, search = '') {
                 const total = response.data.length;
                 
                 $(".text-muted").html(`
-                    Showing ${start} to ${end} of ${total} entries
+                    Showing ${start} to ${end} of ${total} orders
                 `).fadeIn();
 
                 // Generate pagination
@@ -464,7 +498,7 @@ $("#editOrderForm").submit(function(e) {
     let formData = $(this).serialize();
 
     $.ajax({
-        url: base_url + "orders/update",
+        url: base_url + "orders/update_ajax",
         type: "POST",
         data: formData,
         dataType: "json",

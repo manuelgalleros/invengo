@@ -8,10 +8,11 @@ class Groups extends Admin_Controller
 
 		$this->not_logged_in();
 
-		$this->data['page_title'] = 'Groups';
+		$this->data['page_title'] = 'Manage Groups';
 		
 
 		$this->load->model('model_groups');
+		$this->load->model('model_users');
 	}
 
 	/* 
@@ -26,8 +27,9 @@ class Groups extends Admin_Controller
 		}
 
 		$groups_data = $this->model_groups->getGroupData();
+		$user_id = $this->session->userdata('id');
 		$this->data['groups_data'] = $groups_data;
-
+        $this->data['user_data'] = $this->model_users->getUserData($user_id);
 		$this->render_template('groups/index', $this->data);
 	}	
 
@@ -38,8 +40,11 @@ class Groups extends Admin_Controller
 	*/
 	public function create()
 	{
-
 		if(!in_array('createGroup', $this->permission)) {
+			if($this->input->is_ajax_request()) {
+				echo json_encode(['success' => false, 'message' => 'You do not have permission to create a group']);
+				return;
+			}
 			redirect('dashboard', 'refresh');
 		}
 
@@ -56,16 +61,49 @@ class Groups extends Admin_Controller
 
         	$create = $this->model_groups->create($data);
         	if($create == true) {
-        		$this->session->set_flashdata('success', 'Successfully created');
+        		if($this->input->is_ajax_request()) {
+        			// Clear any existing flash messages
+        			$this->session->unset_userdata('success');
+        			$this->session->unset_userdata('error');
+        			
+        			echo json_encode([
+        				'success' => true, 
+        				'message' => 'Group ' . $this->input->post('group_name') . ' was successfully created',
+        				'group_name' => $this->input->post('group_name')
+        			]);
+        			return;
+        		}
+        		
+        		// Set flash data
+        		$this->session->set_flashdata('success', 'Group ' . $this->input->post('group_name') . ' was successfully created');
         		redirect('groups/', 'refresh');
         	}
         	else {
-        		$this->session->set_flashdata('errors', 'Error occurred!!');
+        		if($this->input->is_ajax_request()) {
+        			// Clear any existing flash messages
+        			$this->session->unset_userdata('success');
+        			$this->session->unset_userdata('error');
+        			
+        			echo json_encode(['success' => false, 'message' => 'Error occurred!!']);
+        			return;
+        		}
+        		
+        		$this->session->set_flashdata('error', 'Error occurred!!');
         		redirect('groups/create', 'refresh');
         	}
         }
         else {
             // false case
+            if($this->input->is_ajax_request()) {
+            	// Clear any existing flash messages to prevent them from showing on page refresh
+            	$this->session->unset_userdata('success');
+            	$this->session->unset_userdata('error');
+            	
+            	echo json_encode(['success' => false, 'message' => validation_errors()]);
+            	return;
+            }
+			$user_id = $this->session->userdata('id');
+            $this->data['user_data'] = $this->model_users->getUserData($user_id);
             $this->render_template('groups/create', $this->data);
         }	
 	}
@@ -79,6 +117,10 @@ class Groups extends Admin_Controller
 	{
 
 		if(!in_array('updateGroup', $this->permission)) {
+			if($this->input->is_ajax_request()) {
+				echo json_encode(['success' => false, 'message' => 'You do not have permission to update a group']);
+				return;
+			}
 			redirect('dashboard', 'refresh');
 		}
 
@@ -97,16 +139,47 @@ class Groups extends Admin_Controller
 
 	        	$update = $this->model_groups->edit($data, $id);
 	        	if($update == true) {
+	        		if($this->input->is_ajax_request()) {
+	        			// Clear any existing flash messages to prevent them from showing on page refresh
+	        			$this->session->unset_userdata('success');
+	        			$this->session->unset_userdata('error');
+	        			
+	        			echo json_encode([
+	        				'success' => true, 
+	        				'message' => 'Successfully updated',
+	        				'group_name' => $this->input->post('group_name')
+	        			]);
+	        			return;
+	        		}
+	        		
 	        		$this->session->set_flashdata('success', 'Successfully updated');
 	        		redirect('groups/', 'refresh');
 	        	}
 	        	else {
+	        		if($this->input->is_ajax_request()) {
+	        			// Clear any existing flash messages to prevent them from showing on page refresh
+	        			$this->session->unset_userdata('success');
+	        			$this->session->unset_userdata('error');
+	        			
+	        			echo json_encode(['success' => false, 'message' => 'Error occurred!!']);
+	        			return;
+	        		}
+	        		
 	        		$this->session->set_flashdata('errors', 'Error occurred!!');
 	        		redirect('groups/edit/'.$id, 'refresh');
 	        	}
 	        }
 	        else {
 	            // false case
+	            if($this->input->is_ajax_request()) {
+	            	// Clear any existing flash messages to prevent them from showing on page refresh
+	            	$this->session->unset_userdata('success');
+	            	$this->session->unset_userdata('error');
+	            	
+	            	echo json_encode(['success' => false, 'message' => validation_errors()]);
+	            	return;
+	            }
+	            
 	            $group_data = $this->model_groups->getGroupData($id);
 				$this->data['group_data'] = $group_data;
 				$this->render_template('groups/edit', $this->data);	
@@ -120,14 +193,54 @@ class Groups extends Admin_Controller
 	*/
 	public function delete($id)
 	{
-
 		if(!in_array('deleteGroup', $this->permission)) {
+			if($this->input->is_ajax_request()) {
+				echo json_encode(['success' => false, 'message' => 'You do not have permission to delete a group']);
+				return;
+			}
 			redirect('dashboard', 'refresh');
 		}
 
 		if($id) {
-			if($this->input->post('confirm')) {
+			// Get group info before deletion for the response
+			$group_data = $this->model_groups->getGroupData($id);
+			$group_name = $group_data ? $group_data['group_name'] : '';
 
+			// For AJAX requests
+			if($this->input->is_ajax_request()) {
+				// Clear any existing flash messages to prevent them from showing on page refresh
+				$this->session->unset_userdata('success');
+				$this->session->unset_userdata('error');
+				
+				$check = $this->model_groups->existInUserGroup($id);
+				if($check == true) {
+					echo json_encode([
+						'success' => false, 
+						'message' => 'Group exists in the users'
+					]);
+					return;
+				}
+				else {
+					$delete = $this->model_groups->delete($id);
+					if($delete == true) {
+						echo json_encode([
+							'success' => true, 
+							'message' => 'Successfully removed',
+							'group_name' => $group_name
+						]);
+						return;
+					}
+					else {
+						echo json_encode([
+							'success' => false, 
+							'message' => 'Error occurred!!'
+						]);
+						return;
+					}
+				}
+			}
+			// For regular form submissions
+			else if($this->input->post('confirm')) {
 				$check = $this->model_groups->existInUserGroup($id);
 				if($check == true) {
 					$this->session->set_flashdata('error', 'Group exists in the users');
@@ -152,5 +265,151 @@ class Groups extends Admin_Controller
 		}
 	}
 
+	/*
+	* Get group permissions via AJAX
+	* Returns JSON data of the group permissions
+	*/
+	public function get_group_permissions()
+	{
+		// Check if this is an AJAX request
+		if (!$this->input->is_ajax_request()) {
+			redirect('dashboard', 'refresh');
+		}
+
+		// Check if group_id is provided
+		$group_id = $this->input->post('group_id');
+		if (!$group_id) {
+			$response = array(
+				'success' => false,
+				'message' => 'No group ID provided'
+			);
+			echo json_encode($response);
+			return;
+		}
+
+		// Get group data
+		$group_data = $this->model_groups->getGroupData($group_id);
+		if (!$group_data) {
+			$response = array(
+				'success' => false,
+				'message' => 'Group not found'
+			);
+			echo json_encode($response);
+			return;
+		}
+
+		// Unserialize permissions - ensure it's an array
+		$permissions = unserialize($group_data['permission']);
+		$permissions = is_array($permissions) ? $permissions : array();
+
+		// Return permissions
+		$response = array(
+			'success' => true,
+			'group_name' => $group_data['group_name'],
+			'permissions' => $permissions
+		);
+
+		echo json_encode($response);
+	}
+	
+	/*
+	* Get groups via AJAX with pagination and search functionality
+	* Returns JSON data of groups
+	*/
+	public function getGroups()
+	{
+		// Check if this is an AJAX request
+		if (!$this->input->is_ajax_request()) {
+			redirect('dashboard', 'refresh');
+		}
+		
+		// Get pagination parameters
+		$page = $this->input->get('page') ? (int)$this->input->get('page') : 1;
+		$search = $this->input->get('search') ? $this->input->get('search') : '';
+		$limit = 10; // Items per page
+		$offset = ($page - 1) * $limit;
+		
+		// Get groups with pagination
+		$groups = $this->model_groups->getGroupDataWithPagination($limit, $offset, $search);
+		$total_groups = $this->model_groups->getTotalGroups($search);
+		
+		// Format response
+		$response = array(
+			'groups' => $groups,
+			'total_groups' => $total_groups,
+			'page' => $page,
+			'limit' => $limit
+		);
+		
+		echo json_encode($response);
+	}
+
+	/*
+	* Delete multiple groups at once via AJAX
+	*/
+	public function delete_multiple()
+	{
+		if(!in_array('deleteGroup', $this->permission)) {
+			echo json_encode(['success' => false, 'message' => 'You do not have permission to delete groups']);
+			return;
+		}
+
+		// Get group IDs
+		$group_ids = $this->input->post('group_ids');
+		
+		if(!$group_ids || !is_array($group_ids)) {
+			echo json_encode(['success' => false, 'message' => 'No groups selected']);
+			return;
+		}
+		
+		$success_count = 0;
+		$error_count = 0;
+		$user_groups = 0;
+		$deleted_names = [];
+		
+		// Process each group
+		foreach($group_ids as $id) {
+			// Get group name before deletion
+			$group_data = $this->model_groups->getGroupData($id);
+			
+			// Check if group exists in users
+			$check = $this->model_groups->existInUserGroup($id);
+			if($check == true) {
+				$user_groups++;
+				continue;
+			}
+			
+			// Delete group
+			$delete = $this->model_groups->delete($id);
+			if($delete) {
+				$success_count++;
+				if($group_data) {
+					$deleted_names[] = $group_data['group_name'];
+				}
+			} else {
+				$error_count++;
+			}
+		}
+		
+		// Build response
+		$message = '';
+		if($success_count > 0) {
+			$message .= $success_count . ' group(s) successfully deleted.';
+		}
+		if($user_groups > 0) {
+			$message .= ($message ? ' ' : '') . $user_groups . ' group(s) could not be deleted because they are assigned to users.';
+		}
+		if($error_count > 0) {
+			$message .= ($message ? ' ' : '') . $error_count . ' group(s) failed to delete due to errors.';
+		}
+		
+		echo json_encode([
+			'success' => ($success_count > 0),
+			'message' => $message,
+			'deleted_count' => $success_count,
+			'error_count' => $error_count + $user_groups,
+			'deleted_names' => $deleted_names
+		]);
+	}
 
 }

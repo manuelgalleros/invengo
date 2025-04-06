@@ -93,7 +93,7 @@
                     <div class="card-footer">
                         <div class="d-flex justify-content-between align-items-center">
                             <div class="text-muted" id="pagination-status" style="display: none;">
-                                Showing 0 to 0 of 0 entries
+                                Showing 0 to 0 of 0 brands
                             </div>
                             <ul class="pagination mb-0" style="display: none;">
                                 <!-- Pagination will be inserted here -->
@@ -171,20 +171,35 @@
 
 <!-- Delete Modal -->
 <div id="removeBrandModal" class="modal fade" tabindex="-1" aria-labelledby="removeBrandModalLabel" style="display: none;" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content modal-filled bg-danger">
-            <div class="modal-header">
-                <h4 class="modal-title" id="removeBrandModalLabel">Delete Brand(s)</h4>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-0 pb-0">
+                <h4 class="modal-title text-danger" id="deleteBrandTitle">
+                    <i class="ti ti-trash me-2"></i>Delete Brand
+                </h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form role="form" id="removeBrandForm">
-                <div class="modal-body">
-                    <p>Are you sure you want to delete the selected brand(s)? This action cannot be undone.</p>
+                <div class="modal-body text-center py-4">
+                    <div class="mb-4">
+                        <div class="avatar-lg mx-auto">
+                            <div class="avatar-title bg-danger-subtle text-danger rounded-circle">
+                                <i class="ti ti-trash fs-24"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-muted mb-4">
+                        <p id="deleteBrandMessage" class="fs-5 mb-0">Are you sure you want to delete the selected brand(s)? This action cannot be undone.</p>
+                    </div>
                     <input type="hidden" id="removeBrandIds">
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-info" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-dark">Delete</button>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">
+                        <i class="ti ti-x me-1"></i>Cancel
+                    </button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="ti ti-trash me-1"></i>Delete
+                    </button>
                 </div>
             </form>
         </div>
@@ -224,7 +239,7 @@ function loadBrandTable(page = 1, search = '') {
                                 <input type="checkbox" class="form-check-input brand-check" value="${row.id}">
                             </td>
                             <td>${row.name}</td>
-                            <td>${row.status}</td>
+                            <td>${(row.active == 1) ? '<span class="badge bg-success">Active</span>' : '<span class="badge bg-danger">Inactive</span>'}</td>
                         </tr>
                     `;
                 });
@@ -234,45 +249,54 @@ function loadBrandTable(page = 1, search = '') {
                 
                 // Generate pagination HTML
                 let paginationHtml = '';
-                let totalPages = Math.ceil(response.total_rows / response.per_page);
+                let total = response.total_rows;
+                let totalPages = Math.ceil(total / 10);
                 
-                // Previous button
-                paginationHtml += `
-                    <li class="page-item ${page <= 1 ? 'disabled' : ''}">
-                        <a class="page-link" href="javascript:void(0);" data-page="${page - 1}">Previous</a>
-                    </li>
-                `;
-                
-                // Page numbers
-                for(let i = 1; i <= totalPages; i++) {
+                if (totalPages > 1) {
+                    // Previous button
                     paginationHtml += `
-                        <li class="page-item ${i === page ? 'active' : ''}">
-                            <a class="page-link" href="javascript:void(0);" data-page="${i}">${i}</a>
+                        <li class="page-item ${page <= 1 ? 'disabled' : ''}">
+                            <a class="page-link" href="javascript:void(0);" onclick="loadBrandTable(${page - 1}, '${search}')">
+                                <i class="ti ti-chevron-left"></i>
+                            </a>
                         </li>
                     `;
+                    
+                    // Page numbers
+                    for(let i = 1; i <= totalPages; i++) {
+                        paginationHtml += `
+                            <li class="page-item ${i === parseInt(page) ? 'active' : ''}">
+                                <a class="page-link" href="javascript:void(0);" onclick="loadBrandTable(${i}, '${search}')">${i}</a>
+                            </li>
+                        `;
+                    }
+                    
+                    // Next button
+                    paginationHtml += `
+                        <li class="page-item ${page >= totalPages ? 'disabled' : ''}">
+                            <a class="page-link" href="javascript:void(0);" onclick="loadBrandTable(${page + 1}, '${search}')">
+                                <i class="ti ti-chevron-right"></i>
+                            </a>
+                        </li>
+                    `;
+                    
+                    // Update pagination and status
+                    $(".pagination").html(paginationHtml).fadeIn();
+                } else {
+                    $(".pagination").hide();
                 }
                 
-                // Next button
-                paginationHtml += `
-                    <li class="page-item ${page >= totalPages ? 'disabled' : ''}">
-                        <a class="page-link" href="javascript:void(0);" data-page="${page + 1}">Next</a>
-                    </li>
-                `;
-                
-                // Update pagination and status
-                $(".pagination").html(paginationHtml);
-                let start = ((page - 1) * response.per_page) + 1;
-                let end = Math.min(start + response.per_page - 1, response.total_rows);
-                $("#pagination-status").html(`Showing ${start} to ${end} of ${response.total_rows} entries`);
+                let start = ((page - 1) * 10) + 1;
+                let end = Math.min(start + 10 - 1, total);
+                $("#pagination-status").html(`Showing ${start} to ${end} of ${total} brands`).fadeIn();
             } else {
                 $("#brandBody").html(`
                     <tr>
                         <td colspan="3" class="text-center">No brands found</td>
                     </tr>
                 `);
-                $(".pagination").html('');
-                $("#pagination-status").html('Showing 0 to 0 of 0 entries');
-                $("#pagination-status, .pagination").fadeIn();
+                $(".pagination").hide();
+                $("#pagination-status").html('Showing 0 to 0 of 0 brands').fadeIn();
             }
             
             $("#showBrandsBtn").hide();
@@ -336,6 +360,8 @@ $(document).ready(function() {
         e.preventDefault();
         e.stopPropagation();
         let selectedBrand = $(".brand-check:checked").val();
+        console.log("Selected brand ID:", selectedBrand);
+        
         if(selectedBrand) {
             // Fetch brand details and show edit modal
             $.ajax({
@@ -344,12 +370,13 @@ $(document).ready(function() {
                 data: { brand_id: selectedBrand },
                 dataType: 'json',
                 success: function(response) {
-                    if(response.success) {
-                        $('#edit_brand_id').val(response.id);
-                        $('#edit_brand_name').val(response.name);
-                        $('#edit_active').val(response.active);
-                        $('#editBrandModal').modal('show');
-                    }
+                    $('#edit_brand_id').val(response.id);
+                    $('#edit_brand_name').val(response.name);
+                    $('#edit_active').val(response.active);
+                    $('#editBrandModal').modal('show');
+                },
+                error: function(xhr, status, error) {
+                    console.error("Error fetching brand data:", xhr.responseText);
                 }
             });
         }
@@ -359,11 +386,29 @@ $(document).ready(function() {
         e.preventDefault();
         e.stopPropagation();
         let selectedBrands = [];
+        let brandNames = [];
+        
         $(".brand-check:checked").each(function() {
             selectedBrands.push($(this).val());
+            // Get the brand name from the row
+            let brandName = $(this).closest('tr').find('td:eq(1)').text();
+            brandNames.push(brandName);
         });
+        
         if(selectedBrands.length > 0) {
             $('#removeBrandIds').val(JSON.stringify(selectedBrands));
+            
+            // Update modal title and message based on selection count
+            if(selectedBrands.length === 1) {
+                // Single brand deletion
+                $("#deleteBrandTitle").html('<i class="ti ti-trash me-2"></i>Delete Brand');
+                $("#deleteBrandMessage").html(`Are you sure you want to delete brand <strong>${brandNames[0]}</strong>? This action cannot be undone.`);
+            } else {
+                // Multiple brand deletion
+                $("#deleteBrandTitle").html('<i class="ti ti-trash me-2"></i>Delete Multiple Brands');
+                $("#deleteBrandMessage").html(`Are you sure you want to delete <strong>${selectedBrands.length}</strong> selected brands? This action cannot be undone.`);
+            }
+            
             $('#removeBrandModal').modal('show');
         }
     });
@@ -444,15 +489,6 @@ $(document).ready(function() {
             }
         });
     });
-
-    // Handle pagination clicks
-    $(document).on('click', '.pagination .page-link', function(e) {
-        e.preventDefault();
-        var page = $(this).data('page');
-        if(page > 0) {
-            loadBrandTable(page, $('#searchBox').val());
-        }
-    });
 });
 
 // Function to toggle brand actions visibility
@@ -471,4 +507,4 @@ function toggleBrandActions() {
         $('.brand-actions').removeClass('show').addClass('d-none');
     }
 }
-</script>
+</script> 

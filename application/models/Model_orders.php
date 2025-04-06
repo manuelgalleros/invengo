@@ -36,12 +36,10 @@ class Model_orders extends CI_Model
 	public function create()
 	{
 		$user_id = $this->session->userdata('id');
-		$bill_no = 'BILPR-'.strtoupper(substr(md5(uniqid(mt_rand(), true)), 0, 4));
+		$order_no = 'INVGO-'.strtoupper(substr(md5(uniqid(mt_rand(), true)), 0, 6));
     	$data = array(
-    		'bill_no' => $bill_no,
-    		'customer_name' => $this->input->post('customer_name'),
-    		'customer_address' => $this->input->post('customer_address'),
-    		'customer_phone' => $this->input->post('customer_phone'),
+    		'order_no' => $order_no,
+    		'payment_method' => $this->input->post('payment_method'),
     		'date_time' => strtotime(date('Y-m-d h:i:s a')),
     		'gross_amount' => $this->input->post('gross_amount_value'),
     		'service_charge_rate' => $this->input->post('service_charge_rate'),
@@ -50,7 +48,7 @@ class Model_orders extends CI_Model
     		'vat_charge' => ($this->input->post('vat_charge_value') > 0) ? $this->input->post('vat_charge_value') : 0,
     		'net_amount' => $this->input->post('net_amount_value'),
     		'discount' => $this->input->post('discount'),
-    		'paid_status' => 2,
+    		'paid_status' => $this->input->post('paid_status') ? $this->input->post('paid_status') : 0,
     		'user_id' => $user_id
     	);
 
@@ -100,9 +98,7 @@ class Model_orders extends CI_Model
 			// fetch the order data 
 
 			$data = array(
-				'customer_name' => $this->input->post('customer_name'),
-	    		'customer_address' => $this->input->post('customer_address'),
-	    		'customer_phone' => $this->input->post('customer_phone'),
+				'payment_method' => $this->input->post('payment_method'),
 	    		'gross_amount' => $this->input->post('gross_amount_value'),
 	    		'service_charge_rate' => $this->input->post('service_charge_rate'),
 	    		'service_charge' => ($this->input->post('service_charge_value') > 0) ? $this->input->post('service_charge_value'):0,

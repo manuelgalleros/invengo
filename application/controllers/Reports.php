@@ -9,6 +9,7 @@ class Reports extends Admin_Controller
 		parent::__construct();
 		$this->data['page_title'] = 'Stores';
 		$this->load->model('model_reports');
+		$this->load->model('model_users');
 	}
 
 	/* 
@@ -49,6 +50,8 @@ class Reports extends Admin_Controller
 			
 		}
 		
+		$user_id = $this->session->userdata('id');
+        $this->data['user_data'] = $this->model_users->getUserData($user_id);
 		$this->data['selected_year'] = $today_year;
 		$this->data['company_currency'] = $this->company_currency();
 		$this->data['results'] = $final_parking_data;

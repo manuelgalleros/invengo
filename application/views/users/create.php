@@ -137,7 +137,7 @@
                                 
                                 <div class="col-lg-6">
                                     <div class="mb-3">
-                                        <label class="form-label mb-2">Gender</label>
+                                        <label class="form-label mb-2">Gender <span class="text-danger">*</span></label>
                                         <div class="d-flex gap-3" style="margin-top: 5px">
                                             <div class="form-check">
                                                 <input class="form-check-input" type="radio" name="gender" id="male" value="1">

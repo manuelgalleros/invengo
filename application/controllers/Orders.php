@@ -43,14 +43,16 @@ class Orders extends Admin_Controller
 		$search = $this->input->get('search') ? $this->input->get('search') : '';
 
 		// Get orders with pagination
-		$this->db->select('*');
+		$this->db->select('orders.*, users.firstname, users.lastname');
 		$this->db->from('orders');
+		$this->db->join('users', 'users.id = orders.user_id', 'left');
 		
 		if(!empty($search)) {
 			$this->db->group_start();
-			$this->db->like('bill_no', $search);
-			$this->db->or_like('customer_name', $search);
-			$this->db->or_like('customer_phone', $search);
+			$this->db->like('orders.order_no', $search);
+			$this->db->or_like('users.firstname', $search);
+			$this->db->or_like('users.lastname', $search);
+			$this->db->or_like('orders.payment_method', $search);
 			$this->db->group_end();
 		}
 
@@ -60,7 +62,7 @@ class Orders extends Admin_Controller
 
 		// Get paginated results
 		$this->db->limit($per_page, ($page - 1) * $per_page);
-		$this->db->order_by('id', 'DESC');
+		$this->db->order_by('orders.id', 'DESC');
 		$query = $this->db->get();
 		$orders = $query->result_array();
 
@@ -70,15 +72,21 @@ class Orders extends Admin_Controller
 			$date = date('d-m-Y', $order['date_time']);
 			$time = date('h:i a', $order['date_time']);
 			$date_time = $date . ' ' . $time;
+			
+			// Create a user name from firstname and lastname
+			$user_name = '';
+			if(!empty($order['firstname']) || !empty($order['lastname'])) {
+				$user_name = $order['firstname'] . ' ' . $order['lastname'];
+			}
 
 			$data[] = array(
 				'id' => $order['id'],
-				'bill_no' => $order['bill_no'],
-				'customer_name' => $order['customer_name'],
-				'customer_phone' => $order['customer_phone'],
+				'order_no' => $order['order_no'],
 				'date_time' => $date_time,
 				'total_products' => $count_total_item,
 				'net_amount' => $order['net_amount'],
+				'payment_method' => $order['payment_method'] ? ucfirst(strtolower($order['payment_method'])) : '',
+				'user_name' => $user_name,
 				'paid_status' => $order['paid_status']
 			);
 		}
@@ -132,29 +140,75 @@ class Orders extends Admin_Controller
 	public function create()
 	{
 		if(!in_array('createOrder', $this->permission)) {
+            if($this->input->is_ajax_request()) {
+                echo json_encode(array('success' => false, 'message' => 'You do not have permission to create orders'));
+                return;
+            }
             redirect('dashboard', 'refresh');
         }
 
-		$this->data['page_title'] = 'Add Order';
-
+		$this->data['page_title'] = 'Create New Order';
 		$this->form_validation->set_rules('product[]', 'Product name', 'trim|required');
 		
-	
+        // Debug received data for AJAX requests
+        if($this->input->is_ajax_request()) {
+            $post_data = $this->input->post();
+            log_message('debug', 'AJAX Order Create - POST data: ' . json_encode($post_data));
+        }
+        
         if ($this->form_validation->run() == TRUE) {        	
         	
         	$order_id = $this->model_orders->create();
         	
         	if($order_id) {
+                // Check if this is an AJAX request
+                if($this->input->is_ajax_request()) {
+                    // Get the order details to include in the response
+                    $order_data = $this->model_orders->getOrdersData($order_id);
+                    
+                    $response = array(
+                        'success' => true,
+                        'message' => 'Order successfully created',
+                        'order_id' => $order_id,
+                        'order_no' => $order_data['order_no'],
+                        'paid_status' => $order_data['paid_status']
+                    );
+                    echo json_encode($response);
+                    return;
+                }
+                
+                // Standard form submission (fallback)
         		$this->session->set_flashdata('success', 'Successfully created');
         		redirect('orders/update/'.$order_id, 'refresh');
         	}
         	else {
+                // Check if this is an AJAX request
+                if($this->input->is_ajax_request()) {
+                    $response = array(
+                        'success' => false,
+                        'message' => 'Error occurred while creating order'
+                    );
+                    echo json_encode($response);
+                    return;
+                }
+                
+                // Standard form submission (fallback)
         		$this->session->set_flashdata('errors', 'Error occurred!!');
         		redirect('orders/create/', 'refresh');
         	}
         }
         else {
-            // false case
+            // If this is an AJAX request and there's validation error
+            if($this->input->is_ajax_request()) {
+                $response = array(
+                    'success' => false,
+                    'message' => strip_tags(validation_errors())
+                );
+                echo json_encode($response);
+                return;
+            }
+            
+            // Load the view
         	$company = $this->model_company->getCompanyData(1);
         	$this->data['company_data'] = $company;
         	$this->data['is_vat_enabled'] = ($company['vat_charge_value'] > 0) ? true : false;
@@ -163,7 +217,6 @@ class Orders extends Admin_Controller
         	$this->data['products'] = $this->model_products->getActiveProductData();  
             $user_id = $this->session->userdata('id');
             $this->data['user_data'] = $this->model_users->getUserData($user_id);
-            $this->render_template('orders/index', $this->data);
 
             $this->render_template('orders/create', $this->data);
         }	
@@ -347,10 +400,8 @@ class Orders extends Admin_Controller
 			      
 			      <div class="col-sm-4 invoice-col">
 			        
-			        <b>Bill ID:</b> '.$order_data['bill_no'].'<br>
-			        <b>Name:</b> '.$order_data['customer_name'].'<br>
-			        <b>Address:</b> '.$order_data['customer_address'].' <br />
-			        <b>Phone:</b> '.$order_data['customer_phone'].'
+			        <b>Order No:</b> '.$order_data['order_no'].'<br>
+			        <b>Payment Method:</b> '.ucfirst($order_data['payment_method']).'
 			      </div>
 			      <!-- /.col -->
 			    </div>
@@ -442,5 +493,84 @@ class Orders extends Admin_Controller
 			  echo $html;
 		}
 	}
+
+    /*
+    * Update order payment method and paid status via AJAX
+    */
+    public function update_ajax()
+    {
+        // Check permission
+        if(!in_array('updateOrder', $this->permission)) {
+            $response['success'] = false;
+            $response['messages'] = 'You do not have permission to update orders';
+            echo json_encode($response);
+            return;
+        }
+        
+        $order_id = $this->input->post('edit_order_id');
+        
+        if($order_id) {
+            $user_id = $this->session->userdata('id');
+            
+            // Update only the payment method and paid status
+            $data = array(
+                'payment_method' => $this->input->post('edit_payment_method'),
+                'paid_status' => $this->input->post('edit_paid_status'),
+                'user_id' => $user_id
+            );
+            
+            $this->db->where('id', $order_id);
+            $update = $this->db->update('orders', $data);
+            
+            if($update) {
+                $response['success'] = true;
+                $response['messages'] = 'Order successfully updated';
+            } else {
+                $response['success'] = false;
+                $response['messages'] = 'Error occurred while updating order';
+            }
+        } else {
+            $response['success'] = false;
+            $response['messages'] = 'Order ID is required';
+        }
+        
+        echo json_encode($response);
+    }
+
+    /*
+    * Fetch single order details for editing
+    */
+    public function get_order()
+    {
+        // Check permission
+        if(!in_array('updateOrder', $this->permission)) {
+            $response['success'] = false;
+            $response['messages'] = 'You do not have permission to update orders';
+            echo json_encode($response);
+            return;
+        }
+        
+        $order_id = $this->input->post('order_id');
+        if($order_id) {
+            $order_data = $this->model_orders->getOrdersData($order_id);
+            
+            if($order_data) {
+                $response['success'] = true;
+                $response['data'] = array(
+                    'id' => $order_data['id'],
+                    'payment_method' => $order_data['payment_method'],
+                    'paid_status' => $order_data['paid_status']
+                );
+            } else {
+                $response['success'] = false;
+                $response['messages'] = 'Order not found';
+            }
+        } else {
+            $response['success'] = false;
+            $response['messages'] = 'Order ID is required';
+        }
+        
+        echo json_encode($response);
+    }
 
 }

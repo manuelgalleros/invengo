@@ -19,6 +19,14 @@ class Products extends Admin_Controller
         $this->load->model('model_users');
 		$this->load->model('model_attributes');
         $this->load->library('upload');
+
+        // Ensure upload directory exists and is writable
+        $upload_path = FCPATH . 'assets/images/product_images/';
+        if (!file_exists($upload_path)) {
+            mkdir($upload_path, 0777, true);
+        } elseif (!is_writable($upload_path)) {
+            chmod($upload_path, 0777);
+        }
 	}
 
     /* 
@@ -96,13 +104,28 @@ class Products extends Admin_Controller
             var end = '.$end.';
             var paginationHtml = "";
             
+            // First page button
+            paginationHtml += \'<li class="page-item \' + (currentPage === 1 ? "disabled" : "") + \'">\';
+            paginationHtml += \'<a href="#" class="page-link" data-page="1"><i class="ti ti-chevrons-left"></i></a>\';
+            paginationHtml += \'</li>\';
+            
             // Previous button
             paginationHtml += \'<li class="page-item \' + (currentPage === 1 ? "disabled" : "") + \'">\';
             paginationHtml += \'<a href="#" class="page-link" data-page="\' + (currentPage - 1) + \'">Previous</a>\';
             paginationHtml += \'</li>\';
 
             // Page numbers
-            for(var i = 1; i <= totalPages; i++) {
+            var startPage = Math.max(1, currentPage - 2);
+            var endPage = Math.min(totalPages, currentPage + 2);
+
+            if (currentPage <= 3) {
+                endPage = Math.min(5, totalPages);
+            }
+            if (currentPage > totalPages - 2) {
+                startPage = Math.max(totalPages - 4, 1);
+            }
+
+            for (var i = startPage; i <= endPage; i++) {
                 paginationHtml += \'<li class="page-item \' + (i === currentPage ? "active" : "") + \'">\';
                 paginationHtml += \'<a href="#" class="page-link" data-page="\' + i + \'">\' + i + \'</a>\';
                 paginationHtml += \'</li>\';
@@ -112,12 +135,17 @@ class Products extends Admin_Controller
             paginationHtml += \'<li class="page-item \' + (currentPage === totalPages ? "disabled" : "") + \'">\';
             paginationHtml += \'<a href="#" class="page-link" data-page="\' + (currentPage + 1) + \'">Next</a>\';
             paginationHtml += \'</li>\';
+            
+            // Last page button
+            paginationHtml += \'<li class="page-item \' + (currentPage === totalPages ? "disabled" : "") + \'">\';
+            paginationHtml += \'<a href="#" class="page-link" data-page="\' + totalPages + \'"><i class="ti ti-chevrons-right"></i></a>\';
+            paginationHtml += \'</li>\';
 
             $("#productFooter .pagination").html(paginationHtml);
 
             // Clear and update the range info
             $("#productFooter .text-muted").empty();
-            var rangeHtml = \'<div>Showing \' + start + \' to \' + end + \' of \' + totalRows + \' results</div>\';
+            var rangeHtml = \'<div>Showing \' + start + \' to \' + end + \' of \' + totalRows + \' products</div>\';
             $("#productFooter .text-muted").html(rangeHtml);
 
             // Handle pagination clicks
@@ -131,6 +159,39 @@ class Products extends Admin_Controller
         </script>';
     }
     
+    /*
+    * Returns all product IDs for select all functionality
+    */
+    public function get_all_product_ids() {
+        if(!in_array('viewProduct', $this->permission)) {
+            $response = array('success' => false, 'message' => 'Permission denied');
+            echo json_encode($response);
+            return;
+        }
+        
+        $search = $this->input->get('search') ? $this->input->get('search') : '';
+        
+        // Build the query to get all product IDs
+        $this->db->select('id');
+        $this->db->from('products');
+        
+        // Add search condition if search term is provided
+        if (!empty($search)) {
+            $this->db->group_start();
+            $this->db->like('name', $search);
+            $this->db->or_like('sku', $search);
+            $this->db->or_like('description', $search);
+            $this->db->group_end();
+        }
+        
+        $query = $this->db->get();
+        $products = $query->result_array();
+        
+        // Extract just the IDs
+        $product_ids = array_column($products, 'id');
+        
+        echo json_encode(array('success' => true, 'product_ids' => $product_ids));
+    }
 
     /*
     * If the validation is not valid, then it redirects to the create page.
@@ -153,24 +214,9 @@ public function create()
         return;
     }
 
-    // Validate Form Data
-    $this->form_validation->set_rules('product_name', 'Product Name', 'trim|required');
-    $this->form_validation->set_rules('sku', 'SKU', 'trim|required');
-    $this->form_validation->set_rules('price', 'Price', 'trim|required|numeric');
-    $this->form_validation->set_rules('quantity', 'Quantity', 'trim|required|integer');
-    $this->form_validation->set_rules('brand', 'Brand', 'trim|required');
-    $this->form_validation->set_rules('category', 'Category', 'trim|required');
-    $this->form_validation->set_rules('availability', 'Availability', 'trim|required|integer');
-
-    if ($this->form_validation->run() == FALSE) {
-        $errors = $this->form_validation->error_array();
-        echo json_encode(["success" => false, "messages" => $errors]);
-        return;
-    }
-
+    // Skip server-side validation since we're using jQuery validation
     // Upload Image or Assign Default
     $upload_image = $this->upload_image();
-
 
     // Prepare Data for Insertion
     $data = array(
@@ -540,7 +586,7 @@ public function create()
                                 'price' => $row[6],
                                 'qty' => $row[7],
                                 'availability' => $row[8],
-                                'image' => 'default-product.png' // Default image
+                                'image' => 'assets/images/product_images/no-image.jpg' 
                             );
                             
                             if($this->model_products->create($data)) {
@@ -738,6 +784,45 @@ public function create()
         // Save file to PHP output stream
         $writer->save('php://output');
         exit;
+    }
+
+    /**
+     * Check if product field value already exists in database
+     * Used for AJAX validation to prevent duplicate entries
+     */
+    public function check_duplicate()
+    {
+        // Check permission
+        if (!in_array('createProduct', $this->permission) && !in_array('updateProduct', $this->permission)) {
+            echo json_encode(['duplicate' => false]);
+            return;
+        }
+        
+        // Get input parameters
+        $field = $this->input->post('field');
+        $value = $this->input->post('value');
+        $product_id = $this->input->post('product_id');
+        
+        // Validate field parameter
+        $allowed_fields = ['name', 'sku', 'barcode'];
+        if (!in_array($field, $allowed_fields)) {
+            echo json_encode(['duplicate' => false]);
+            return;
+        }
+        
+        // Set up the query
+        $this->db->where($field, $value);
+        
+        // Exclude current product if editing
+        if ($product_id) {
+            $this->db->where('id !=', $product_id);
+        }
+        
+        // Execute query
+        $query = $this->db->get('products');
+        
+        // Return result
+        echo json_encode(['duplicate' => ($query->num_rows() > 0)]);
     }
 
 }

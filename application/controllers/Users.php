@@ -60,6 +60,7 @@ class Users extends Admin_Controller
 		$this->form_validation->set_rules('password', 'Password', 'trim|required|min_length[8]');
 		$this->form_validation->set_rules('cpassword', 'Confirm password', 'trim|required|matches[password]');
 		$this->form_validation->set_rules('fname', 'First name', 'trim|required');
+		$this->form_validation->set_rules('gender', 'Gender', 'trim|required');
 
         if ($this->form_validation->run() == TRUE) {
             // true case
@@ -211,6 +212,7 @@ class Users extends Admin_Controller
 			$this->form_validation->set_rules('username', 'Username', 'trim|required|min_length[5]|max_length[12]');
 			$this->form_validation->set_rules('email', 'Email', 'trim|required');
 			$this->form_validation->set_rules('fname', 'First name', 'trim|required');
+			$this->form_validation->set_rules('gender', 'Gender', 'trim|required');
 
 			if ($this->form_validation->run() == TRUE) {
 	            // true case
@@ -435,21 +437,45 @@ class Users extends Admin_Controller
 	public function delete($id)
 	{
 		if(!in_array('deleteUser', $this->permission)) {
+			if($this->input->is_ajax_request()) {
+				$this->output->set_status_header(403);
+				echo json_encode(['success' => false, 'message' => 'Permission denied']);
+				return;
+			}
 			redirect('dashboard', 'refresh');
 		}
 
 		if($id) {
 			if($this->input->post('confirm')) {
-					$delete = $this->model_users->delete($id);
-					if($delete == true) {
-		        		$this->session->set_flashdata('success', 'Successfully removed');
-		        		redirect('users/', 'refresh');
-		        	}
-		        	else {
-		        		$this->session->set_flashdata('error', 'Error occurred!!');
-		        		redirect('users/delete/'.$id, 'refresh');
-		        	}
-
+				// Get user data to delete profile image if needed
+				$user_data = $this->model_users->getUserData($id);
+				
+				$delete = $this->model_users->delete($id);
+				if($delete == true) {
+					// Delete profile image if not default
+					if(isset($user_data['profile_image']) && $user_data['profile_image'] != 'default.jpg') {
+						$image_path = './assets/images/users/' . $user_data['profile_image'];
+						if(file_exists($image_path)) {
+							unlink($image_path);
+						}
+					}
+					
+					if($this->input->is_ajax_request()) {
+						echo json_encode(['success' => true, 'message' => 'User successfully deleted']);
+						return;
+					}
+					$this->session->set_flashdata('success', 'Successfully removed');
+					redirect('users/', 'refresh');
+				}
+				else {
+					if($this->input->is_ajax_request()) {
+						$this->output->set_status_header(500);
+						echo json_encode(['success' => false, 'message' => 'Error occurred while deleting user']);
+						return;
+					}
+					$this->session->set_flashdata('error', 'Error occurred!!');
+					redirect('users/delete/'.$id, 'refresh');
+				}
 			}	
 			else {
 				$this->data['id'] = $id;
@@ -526,6 +552,8 @@ class Users extends Admin_Controller
 			$this->form_validation->set_rules('username', 'Username', 'trim|required|min_length[5]|max_length[12]');
 			$this->form_validation->set_rules('email', 'Email', 'trim|required');
 			$this->form_validation->set_rules('fname', 'First name', 'trim|required');
+			$this->form_validation->set_rules('gender', 'Gender', 'trim|required');
+
 
 
 			if ($this->form_validation->run() == TRUE) {

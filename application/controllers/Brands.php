@@ -31,7 +31,7 @@ class Brands extends Admin_Controller
 
 		$this->data['results'] = $result;
 
-		$this->render_template('brand/index', $this->data);
+		$this->render_template('brands/index', $this->data);
 	}
 
 	/*
@@ -48,22 +48,24 @@ class Brands extends Admin_Controller
 		$brands = $result['brands'];
 		$total_rows = $result['total_rows'];
 
-		$response = array(
-			'data' => array(),
-			'total_rows' => $total_rows,
-			'per_page' => $per_page
-		);
-
+		$data = array();
 		foreach ($brands as $key => $value) {
 			$status = ($value['active'] == 1) ? '<span class="badge bg-success">Active</span>' : '<span class="badge bg-danger">Inactive</span>';
 			
-			$response['data'][$key] = array(
-				'id' => $value['id'],
-				'name' => $value['name'],
-				'active' => $value['active'],
-				'status' => $status
-			);
+			$temp = array();
+			$temp['id'] = $value['id'];
+			$temp['name'] = $value['name'];
+			$temp['active'] = $value['active'];
+			$temp['status'] = $status;
+			
+			$data[] = $temp;
 		}
+
+		$response = array(
+			'data' => $data,
+			'total_rows' => $total_rows,
+			'per_page' => $per_page
+		);
 
 		echo json_encode($response);
 	}
@@ -77,7 +79,6 @@ class Brands extends Admin_Controller
 	public function fetchBrandDataById()
 	{
 		$brand_id = $this->input->post('brand_id');
-		
 		if($brand_id) {
 			$data = $this->model_brands->getBrandData($brand_id);
 			echo json_encode($data);
@@ -91,7 +92,6 @@ class Brands extends Admin_Controller
 	*/
 	public function create()
 	{
-
 		if(!in_array('createBrand', $this->permission)) {
 			redirect('dashboard', 'refresh');
 		}
@@ -112,7 +112,7 @@ class Brands extends Admin_Controller
         	$create = $this->model_brands->create($data);
         	if($create == true) {
         		$response['success'] = true;
-        		$response['messages'] = 'Succesfully created';
+        		$response['messages'] = 'Successfully created';
         	}
         	else {
         		$response['success'] = false;
@@ -127,7 +127,6 @@ class Brands extends Admin_Controller
         }
 
         echo json_encode($response);
-
 	}
 
 	/*
@@ -151,18 +150,15 @@ class Brands extends Admin_Controller
 			$this->form_validation->set_error_delimiters('<p class="text-danger">','</p>');
 
 	        if ($this->form_validation->run() == TRUE) {
-                // Get brand name
-                $brand_name = $this->input->post('brand_name');
-                
 	        	$data = array(
-	        		'name' => $brand_name,
+	        		'name' => $this->input->post('brand_name'),
 	        		'active' => $this->input->post('active'),	
 	        	);
 
 	        	$update = $this->model_brands->update($data, $brand_id);
 	        	if($update == true) {
 	        		$response['success'] = true;
-	        		$response['messages'] = "Brand '" . $brand_name . "' successfully updated";
+	        		$response['messages'] = 'Successfully updated';
 	        	}
 	        	else {
 	        		$response['success'] = false;
@@ -197,32 +193,11 @@ class Brands extends Admin_Controller
 		$brand_id = $this->input->post('brand_id');
 		$response = array();
 		if($brand_id) {
-			// Get brand name(s) before deletion
-			$brand_names = [];
-			if(is_array($brand_id)) {
-				foreach($brand_id as $id) {
-					$brand_data = $this->model_brands->getBrandData($id);
-					if($brand_data) {
-						$brand_names[] = $brand_data['name'];
-					}
-				}
-			} else {
-				$brand_data = $this->model_brands->getBrandData($brand_id);
-				if($brand_data) {
-					$brand_names[] = $brand_data['name'];
-				}
-			}
-			
-			// Delete the brand(s)
 			$delete = $this->model_brands->remove($brand_id);
 
 			if($delete == true) {
 				$response['success'] = true;
-				if(count($brand_names) == 1) {
-					$response['messages'] = "Brand '" . $brand_names[0] . "' successfully removed";
-				} else {
-					$response['messages'] = count($brand_names) . " brands successfully removed: " . implode(", ", $brand_names);
-				}
+				$response['messages'] = "Successfully removed";	
 			}
 			else {
 				$response['success'] = false;
@@ -236,5 +211,4 @@ class Brands extends Admin_Controller
 
 		echo json_encode($response);
 	}
-
-}
+} 

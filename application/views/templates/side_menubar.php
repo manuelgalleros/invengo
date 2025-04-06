@@ -153,7 +153,7 @@
                                  <?php if(in_array('createGroup', $user_permission)): ?>
                                 <li class="side-nav-item">
                                     <a href="<?php echo base_url("/groups/create")?>" class="side-nav-link">
-                                        <span class="menu-text">Add New Group</span>
+                                        <span class="menu-text">Create New Group</span>
                                     </a>
                                 </li>
                                  <?php endif; ?>
@@ -178,12 +178,6 @@
                     </li>
                     <?php endif; ?>
                     
-                    <li class="side-nav-item">
-                        <a href="<?php echo base_url('activity-log') ?>" class="side-nav-link">
-                            <span class="menu-icon"><i class="ti ti-logs"></i></span>
-                            <span class="menu-text"> Activity Logs </span>
-                        </a>
-                    </li>
                     
                     <?php if(in_array('viewProfile', $user_permission) || in_array('updateSetting', $user_permission)): ?>
                     <li class="side-nav-title mt-2">My Account</li>
@@ -206,6 +200,20 @@
                         </a>
                     </li>
                     <?php endif; ?>
+                    
+                    <li class="side-nav-title mt-2">System</li>
+                    <li class="side-nav-item">
+                        <a href="<?php echo base_url('system/logs') ?>" class="side-nav-link">
+                            <span class="menu-icon"><i class="ti ti-logs"></i></span>
+                            <span class="menu-text"> Activity Logs </span>
+                        </a>
+                    </li>
+                    <li class="side-nav-item">
+                        <a href="<?php echo base_url('system/settings') ?>" class="side-nav-link">
+                            <span class="menu-icon"><i class="ti ti-adjustments-alt"></i></span>
+                            <span class="menu-text"> System Settings </span>
+                        </a>
+                    </li>
                 </ul>
             </div>
         </div>

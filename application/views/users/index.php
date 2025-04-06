@@ -1,4 +1,4 @@
-<!-- Content Wrapper. Contains page content -->
+  <!-- Content Wrapper. Contains page content -->
 <div class="page-content">
   <div class="page-container">
     <div class="page-title-head d-flex align-items-sm-center flex-sm-row flex-column gap-2">
@@ -9,11 +9,11 @@
         <ol class="breadcrumb m-0 py-0">
           <li class="breadcrumb-item"><a href="javascript: void(0);">Home</a></li>
           <li class="breadcrumb-item active">Manage Users</li>
-        </ol>
+      </ol>
       </div>
     </div>
 
-    <div class="row">
+      <div class="row">
       <div class="col-12">
         <div id="messages">
           <?php
@@ -98,11 +98,11 @@
                   <th>Phone</th>
                   <th>Group</th>
                 </tr>
-              </thead>
+                </thead>
               <tbody id="userTableBody">
                 <!-- Users will be loaded here dynamically -->
-              </tbody>
-            </table>
+                </tbody>
+              </table>
           </div>
 
           <div class="card-footer" id="userFooter">
@@ -226,7 +226,7 @@
                   
                   <div class="col-lg-6">
                     <div class="mb-3">
-                      <label class="form-label mb-2">Gender</label>
+                      <label class="form-label mb-2">Gender <span class="text-danger">*</span></label>
                       <div class="d-flex gap-3" style="margin-top: 5px">
                         <div class="form-check">
                           <input class="form-check-input" type="radio" name="gender" id="male" value="1">
@@ -251,7 +251,40 @@
       </div>
     </div>
   </div>
-
+<!-- Delete User Modal -->
+<div class="modal fade" id="deleteUserModal" tabindex="-1" aria-labelledby="deleteUserModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header border-0 pb-0">
+        <h4 class="modal-title text-danger" id="deleteUserTitle">
+          <i class="ti ti-trash me-2"></i>Delete User
+        </h4>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body text-center py-4">
+        <div class="mb-4">
+          <div class="avatar-lg mx-auto">
+            <div class="avatar-title bg-danger-subtle text-danger rounded-circle">
+              <i class="ti ti-trash fs-24"></i>
+            </div>
+          </div>
+        </div>
+        <div class="text-muted mb-4">
+          <p id="deleteUserMessage" class="fs-5 mb-0">Are you sure you want to delete this user? This action cannot be undone.</p>
+        </div>
+        <input type="hidden" id="selectedUserIds" value="">
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">
+          <i class="ti ti-x me-1"></i>Cancel
+        </button>
+        <button type="button" class="btn btn-danger" id="confirmDeleteUser">
+          <i class="ti ti-trash me-1"></i>Delete User
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
   <!-- Edit User Modal -->
   <div class="modal fade" id="editUserModal" tabindex="-1" aria-labelledby="editUserModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -392,10 +425,39 @@
     </div>
   </div>
 
-<script type="text/javascript">
+
+  <script type="text/javascript">
 var base_url = "<?php echo base_url(); ?>";
 
-$(document).ready(function() {
+// Function to create alert HTML
+function createAlertHTML(message, type = 'danger') {
+  return `
+    <div class="alert alert-${type} text-bg-${type} alert-dismissible d-flex align-items-center auto-dismiss mb-2" role="alert">
+      <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+      <iconify-icon icon="${type === 'success' ? 'solar:check-read-line-duotone' : 'solar:danger-triangle-bold-duotone'}" class="fs-20 me-1"></iconify-icon>
+      <div class="lh-1">${message}</div>
+    </div>
+  `;
+}
+
+// Auto-dismiss functionality for flash messages
+function initializeAutoDismissAlerts() {
+  $(".auto-dismiss").each(function() {
+    const $alert = $(this);
+    const timer = setTimeout(function() {
+      $alert.fadeOut(500, function() {
+        $(this).remove();
+      });
+    }, 5000);
+
+    // Clear timeout if manually closed
+    $alert.find('.btn-close').on('click', function() {
+      clearTimeout(timer);
+    });
+  });
+}
+
+    $(document).ready(function() {
   // Initialize Bootstrap dropdowns and modal
   var dropdownElementList = [].slice.call(document.querySelectorAll('[data-bs-toggle="dropdown"]'));
   var dropdownList = dropdownElementList.map(function (dropdownToggleEl) {
@@ -422,34 +484,6 @@ $(document).ready(function() {
       $("#imagePreview").hide();
     }
   });
-
-  // Function to create alert HTML
-  function createAlertHTML(message, type = 'danger') {
-    return `
-      <div class="alert alert-${type} text-bg-${type} alert-dismissible d-flex align-items-center auto-dismiss mb-2" role="alert">
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
-        <iconify-icon icon="${type === 'success' ? 'solar:check-read-line-duotone' : 'solar:danger-triangle-bold-duotone'}" class="fs-20 me-1"></iconify-icon>
-        <div class="lh-1">${message}</div>
-      </div>
-    `;
-  }
-
-  // Auto-dismiss functionality for flash messages
-  function initializeAutoDismissAlerts() {
-    $(".auto-dismiss").each(function() {
-      const $alert = $(this);
-      const timer = setTimeout(function() {
-        $alert.fadeOut(500, function() {
-          $(this).remove();
-        });
-      }, 5000);
-
-      // Clear timeout if manually closed
-      $alert.find('.btn-close').on('click', function() {
-        clearTimeout(timer);
-      });
-    });
-  }
 
   // Password match validation
   function validatePasswordMatch() {
@@ -579,7 +613,6 @@ $(document).ready(function() {
   // Function to update actions button visibility
   function toggleUserActions() {
     let checkedCount = $(".user-checkbox:checked").length;
-    console.log("Checked count:", checkedCount);
     
     if (checkedCount > 0) {
       $('.user-actions').show();
@@ -589,10 +622,8 @@ $(document).ready(function() {
     
     // Show/hide the edit option based on number of selections
     if (checkedCount === 1) {
-      console.log("Showing edit option");
       $('.edit-item').removeClass('hidden').css('display', 'flex');
     } else {
-      console.log("Hiding edit option");
       $('.edit-item').addClass('hidden').css('display', 'none');
     }
   }
@@ -600,7 +631,6 @@ $(document).ready(function() {
   // Select all checkbox functionality
   $("#selectAll").on("change", function() {
     let isChecked = $(this).prop("checked");
-    console.log("Select All changed, checked:", isChecked);
     $(".user-checkbox").prop("checked", isChecked);
     toggleUserActions();
   });
@@ -660,14 +690,12 @@ $(document).ready(function() {
             }
             
           } catch(e) {
-            console.error('Error parsing user data:', e);
             $("#editFormLoader").remove();
             $("#edit-validation-errors").html(createAlertHTML('Failed to load user data. Please try again.'));
             initializeAutoDismissAlerts();
           }
         },
         error: function(xhr, status, error) {
-          console.error('AJAX Error:', error);
           $("#editFormLoader").remove();
           $("#edit-validation-errors").html(createAlertHTML('Failed to load user data. Please try again.'));
           initializeAutoDismissAlerts();
@@ -791,100 +819,6 @@ $(document).ready(function() {
   // Add event listeners for password fields in edit form
   $("#edit_password, #edit_cpassword").on('keyup', validateEditPasswordMatch);
 
-  // Function to load users table with pagination
-  function loadUserTable(page = 1, search = '') {
-    $.ajax({
-      url: base_url + "users/getUsers",
-      type: "GET",
-      data: { 
-        page: page,
-        search: search
-      },
-      dataType: "json",
-      success: function(response) {
-        let html = '';
-        
-        if (response.users && response.users.length > 0) {
-          response.users.forEach(function(user) {
-            html += '<tr>' +
-              '<td class="ps-3">' +
-                '<input type="checkbox" class="form-check-input user-checkbox" value="' + user.id + '">' +
-              '</td>' +
-              '<td style="width: 40px;">' +
-                '<img src="' + base_url + 'assets/images/users/' + (user.profile_image || 'default.jpg') + '"' +
-                     'class="rounded-circle"' +
-                     'style="width: 32px; height: 32px; object-fit: cover;"' +
-                     'alt="' + user.username + '\'s profile">' +
-              '</td>' +
-              '<td>' + user.username + '</td>' +
-              '<td>' + user.email + '</td>' +
-              '<td>' + user.firstname + ' ' + (user.lastname || '') + '</td>' +
-              '<td>' + (user.phone || '') + '</td>' +
-              '<td>' +
-                '<span class="badge text-bg-info">' + user.group_name + '</span>' +
-              '</td>' +
-            '</tr>';
-          });
-        } else {
-          html = '<tr><td colspan="7" class="text-center">No users found</td></tr>';
-        }
-        
-        $("#userTableBody").html(html);
-        
-        // Update pagination if provided
-        if (response.users && response.users.length > 0) {
-          // Update pagination status
-          const start = (page - 1) * 10 + 1;
-          const end = Math.min(start + response.users.length - 1, response.total_users);
-          const total = response.total_users;
-          
-          $("#userRange").html('Showing ' + start + ' to ' + end + ' of ' + total + ' users').fadeIn();
-
-          // Generate pagination
-          let totalPages = Math.ceil(total / 10);
-          let paginationHtml = '';
-          
-          // Always show pagination container
-          $(".pagination").show();
-          
-          // Previous button
-          paginationHtml += '<li class="page-item' + (page <= 1 ? ' disabled' : '') + '"><a class="page-link" href="javascript:void(0);" onclick="loadUserTable(' + (page - 1) + ', \'' + search + '\')">Previous</a></li>';
-          
-          // Page numbers
-          for(let i = 1; i <= totalPages; i++) {
-            paginationHtml += '<li class="page-item' + (i === parseInt(page) ? ' active' : '') + '"><a class="page-link" href="javascript:void(0);" onclick="loadUserTable(' + i + ', \'' + search + '\')">' + i + '</a></li>';
-          }
-          
-          // Next button
-          paginationHtml += '<li class="page-item' + (page >= totalPages ? ' disabled' : '') + '"><a class="page-link" href="javascript:void(0);" onclick="loadUserTable(' + (page + 1) + ', \'' + search + '\')">Next</a></li>';
-          
-          $(".pagination").html(paginationHtml);
-          $("#userFooter").show();
-        } else {
-          $("#userRange").html('Showing 0 to 0 of 0 entries').fadeIn();
-          $(".pagination").html('');
-          $("#userFooter").show();
-        }
-        
-        // Reset checkboxes and actions
-        $('#selectAll').prop('checked', false);
-        $('.user-actions').hide();
-      },
-      error: function(xhr, status, error) {
-        $("#userTableBody").html(
-          '<tr>' +
-            '<td colspan="7" class="text-center text-danger">' +
-              '<div class="d-flex align-items-center justify-content-center">' +
-                '<iconify-icon icon="solar:danger-triangle-bold-duotone" class="fs-20 me-1"></iconify-icon>' +
-                'Failed to load users' +
-              '</div>' +
-            '</td>' +
-          '</tr>'
-        );
-      }
-    });
-  }
-
   // Add CSS for the loading overlay
   $("<style>")
     .prop("type", "text/css")
@@ -902,4 +836,194 @@ $(document).ready(function() {
     `)
     .appendTo("head");
 });
-</script>
+
+// Function to load users table with pagination
+function loadUserTable(page = 1, search = '') {
+  $.ajax({
+    url: base_url + "users/getUsers",
+    type: "GET",
+    data: { 
+      page: page,
+      search: search
+    },
+    dataType: "json",
+    success: function(response) {
+      let html = '';
+      
+      if (response.users && response.users.length > 0) {
+        response.users.forEach(function(user) {
+          html += '<tr>' +
+            '<td class="ps-3">' +
+              '<input type="checkbox" class="form-check-input user-checkbox" value="' + user.id + '">' +
+            '</td>' +
+            '<td style="width: 40px;">' +
+              '<img src="' + base_url + 'assets/images/users/' + (user.profile_image || 'default.jpg') + '"' +
+                   'class="rounded-circle"' +
+                   'style="width: 32px; height: 32px; object-fit: cover;"' +
+                   'alt="' + user.username + '\'s profile">' +
+            '</td>' +
+            '<td>' + user.username + '</td>' +
+            '<td>' + user.email + '</td>' +
+            '<td>' + user.firstname + ' ' + (user.lastname || '') + '</td>' +
+            '<td>' + (user.phone || '') + '</td>' +
+            '<td>' +
+              '<span class="badge text-bg-info">' + user.group_name + '</span>' +
+            '</td>' +
+          '</tr>';
+        });
+      } else {
+        html = '<tr><td colspan="7" class="text-center">No users found</td></tr>';
+      }
+      
+      $("#userTableBody").html(html);
+      
+      // Update pagination if provided
+      if (response.users && response.users.length > 0) {
+        // Update pagination status
+        const start = (page - 1) * 10 + 1;
+        const end = Math.min(start + response.users.length - 1, response.total_users);
+        const total = response.total_users;
+        
+        $("#userRange").html('Showing ' + start + ' to ' + end + ' of ' + total + ' users').fadeIn();
+
+        // Generate pagination
+        let totalPages = Math.ceil(total / 10);
+        let paginationHtml = '';
+        
+        // Always show pagination container
+        $(".pagination").show();
+        
+        // Previous button
+        paginationHtml += '<li class="page-item' + (page <= 1 ? ' disabled' : '') + '"><a class="page-link" href="javascript:void(0);" onclick="loadUserTable(' + (page - 1) + ', \'' + search + '\')">Previous</a></li>';
+        
+        // Page numbers
+        for(let i = 1; i <= totalPages; i++) {
+          paginationHtml += '<li class="page-item' + (i === parseInt(page) ? ' active' : '') + '"><a class="page-link" href="javascript:void(0);" onclick="loadUserTable(' + i + ', \'' + search + '\')">' + i + '</a></li>';
+        }
+        
+        // Next button
+        paginationHtml += '<li class="page-item' + (page >= totalPages ? ' disabled' : '') + '"><a class="page-link" href="javascript:void(0);" onclick="loadUserTable(' + (page + 1) + ', \'' + search + '\')">Next</a></li>';
+        
+        $(".pagination").html(paginationHtml);
+        $("#userFooter").show();
+      } else {
+        $("#userRange").html('Showing 0 to 0 of 0 entries').fadeIn();
+        $(".pagination").html('');
+        $("#userFooter").show();
+      }
+      
+      // Reset checkboxes and actions
+      $('#selectAll').prop('checked', false);
+      $('.user-actions').hide();
+    },
+    error: function(xhr, status, error) {
+      $("#userTableBody").html(
+        '<tr>' +
+          '<td colspan="7" class="text-center text-danger">' +
+            '<div class="d-flex align-items-center justify-content-center">' +
+              '<iconify-icon icon="solar:danger-triangle-bold-duotone" class="fs-20 me-1"></iconify-icon>' +
+              'Failed to load users' +
+            '</div>' +
+          '</td>' +
+        '</tr>'
+      );
+    }
+  });
+}
+
+// Handle delete action
+$(document).on('click', '.delete-item', function(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  
+  // Get all selected user IDs
+  let selectedUserIds = [];
+  $(".user-checkbox:checked").each(function() {
+    selectedUserIds.push($(this).val());
+  });
+  
+  if(selectedUserIds.length > 0) {
+    // Populate delete modal with user info
+    if(selectedUserIds.length === 1) {
+      // Single user deletion
+      let username = $(".user-checkbox:checked").closest('tr').find('td:eq(2)').text();
+      $("#deleteUserTitle").text("Delete User");
+      $("#deleteUserMessage").html(`Are you sure you want to delete user <strong>${username}</strong>? This action cannot be undone.`);
+    } else {
+      // Multiple user deletion
+      $("#deleteUserTitle").text("Delete Multiple Users");
+      $("#deleteUserMessage").html(`Are you sure you want to delete <strong>${selectedUserIds.length}</strong> selected users? This action cannot be undone.`);
+    }
+    
+    // Store selected user IDs in modal
+    $("#selectedUserIds").val(JSON.stringify(selectedUserIds));
+    
+    // Show delete modal
+    $("#deleteUserModal").modal('show');
+  }
+});
+
+// Handle delete confirmation
+$("#confirmDeleteUser").on('click', function() {
+  const selectedUserIds = JSON.parse($("#selectedUserIds").val());
+  
+  if(selectedUserIds.length === 0) {
+    return;
+  }
+  
+  // Show loading state
+  const deleteBtn = $(this);
+  const originalText = deleteBtn.html();
+  deleteBtn.html('<span class="spinner-border spinner-border-sm me-1"></span> Deleting...');
+  deleteBtn.prop('disabled', true);
+  
+  // Process deletion sequentially
+  let successCount = 0;
+  let errorCount = 0;
+  let processedCount = 0;
+  
+  function processNextDeletion(index) {
+    if(index >= selectedUserIds.length) {
+      // All deletions processed, show results
+      const message = `Successfully deleted ${successCount} user${successCount !== 1 ? 's' : ''}` + 
+                     (errorCount > 0 ? `, failed to delete ${errorCount} user${errorCount !== 1 ? 's' : ''}` : '');
+      
+      // Display message at the top using the global createAlertHTML function
+      $("#messages").html(createAlertHTML(message, successCount > 0 ? 'success' : 'danger'));
+      initializeAutoDismissAlerts();
+      
+      // Close modal and refresh table
+      $("#deleteUserModal").modal('hide');
+      loadUserTable();
+      
+      // Reset button state
+      deleteBtn.html(originalText);
+      deleteBtn.prop('disabled', false);
+      return;
+    }
+    
+    const userId = selectedUserIds[index];
+    
+    $.ajax({
+      url: base_url + 'users/delete/' + userId,
+      type: 'POST',
+      data: { confirm: true },
+      success: function(response) {
+        successCount++;
+        processedCount++;
+        processNextDeletion(index + 1);
+      },
+      error: function() {
+        errorCount++;
+        processedCount++;
+        processNextDeletion(index + 1);
+      }
+    });
+  }
+  
+  // Start deletion process
+  processNextDeletion(0);
+    });
+  </script>
+
+

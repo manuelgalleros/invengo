@@ -93,7 +93,7 @@
                     <div class="card-footer">
                         <div class="d-flex justify-content-between align-items-center">
                             <div class="text-muted" id="pagination-status" style="display: none;">
-                                Showing 0 to 0 of 0 entries
+                                Showing 0 to 0 of 0 categories
                             </div>
                             <ul class="pagination mb-0" style="display: none;">
                                 <!-- Pagination will be inserted here -->
@@ -175,25 +175,41 @@
 <?php if(in_array('deleteCategory', $user_permission)): ?>
 <!-- Delete Modal -->
 <div id="removeModal" class="modal fade" tabindex="-1" aria-labelledby="removeModalLabel" style="display: none;" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content modal-filled bg-danger">
-            <div class="modal-header">
-                <h4 class="modal-title" id="removeModalLabel">Delete Category(s)</h4>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-0 pb-0">
+                <h4 class="modal-title text-danger" id="deleteCategoryTitle">
+                    <i class="ti ti-trash me-2"></i>Delete Category
+                </h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form role="form" id="removeForm">
-                <div class="modal-body">
-                    <p>Are you sure you want to delete the selected category(s)? This action cannot be undone.</p>
+                <div class="modal-body text-center py-4">
+                    <div class="mb-4">
+                        <div class="avatar-lg mx-auto">
+                            <div class="avatar-title bg-danger-subtle text-danger rounded-circle">
+                                <i class="ti ti-trash fs-24"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-muted mb-4">
+                        <p id="deleteCategoryMessage" class="fs-5 mb-0">Are you sure you want to delete the selected category(s)? This action cannot be undone.</p>
+                    </div>
                     <input type="hidden" id="removeCategoryIds">
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-info" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-dark">Delete</button>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">
+                        <i class="ti ti-x me-1"></i>Cancel
+                    </button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="ti ti-trash me-1"></i>Delete
+                    </button>
                 </div>
             </form>
         </div>
     </div>
 </div>
+
 <?php endif; ?>
 
 <script type="text/javascript">
@@ -242,7 +258,7 @@ function loadCategoryTable(page = 1, search = '') {
                 const end = Math.min(start + response.data.length - 1, response.pagination.total_records);
                 
                 $("#pagination-status").html(`
-                    Showing ${start} to ${end} of ${response.pagination.total_records} entries
+                    Showing ${start} to ${end} of ${response.pagination.total_records} categories
                 `).fadeIn();
 
                 // Generate pagination
@@ -282,7 +298,7 @@ function loadCategoryTable(page = 1, search = '') {
                         <td colspan="3" class="text-center">No categories found</td>
                     </tr>
                 `);
-                $("#pagination-status").html('Showing 0 to 0 of 0 entries').fadeIn();
+                $("#pagination-status").html('Showing 0 to 0 of 0 categories').fadeIn();
                 $(".pagination").html('').fadeIn();
             }
             
@@ -299,7 +315,7 @@ function loadCategoryTable(page = 1, search = '') {
                     <td colspan="3" class="text-center text-danger">Failed to load categories</td>
                 </tr>
             `);
-            $("#pagination-status").html('Showing 0 to 0 of 0 entries').fadeIn();
+            $("#pagination-status").html('Showing 0 to 0 of 0 categories').fadeIn();
             $(".pagination").html('').fadeIn();
         }
     });
@@ -368,11 +384,29 @@ $(document).ready(function() {
         e.preventDefault();
         e.stopPropagation();
         let selectedCategories = [];
+        let categoryNames = [];
+        
         $(".category-check:checked").each(function() {
             selectedCategories.push($(this).val());
+            // Get the category name from the row
+            let categoryName = $(this).closest('tr').find('td:eq(1)').text();
+            categoryNames.push(categoryName);
         });
+        
         if(selectedCategories.length > 0) {
             $('#removeCategoryIds').val(JSON.stringify(selectedCategories));
+            
+            // Update modal title and message based on selection count
+            if(selectedCategories.length === 1) {
+                // Single category deletion
+                $("#deleteCategoryTitle").html('<i class="ti ti-trash me-2"></i>Delete Category');
+                $("#deleteCategoryMessage").html(`Are you sure you want to delete category <strong>${categoryNames[0]}</strong>? This action cannot be undone.`);
+            } else {
+                // Multiple category deletion
+                $("#deleteCategoryTitle").html('<i class="ti ti-trash me-2"></i>Delete Multiple Categories');
+                $("#deleteCategoryMessage").html(`Are you sure you want to delete <strong>${selectedCategories.length}</strong> selected categories? This action cannot be undone.`);
+            }
+            
             $('#removeModal').modal('show');
         }
     });
