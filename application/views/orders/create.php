@@ -71,32 +71,32 @@
                       <div class="row">
                         <div class="col-md-6 mb-2">
                           <div class="form-check">
-                            <input class="form-check-input" type="radio" name="payment_method" id="paymentCash" value="cash" checked>
+                            <input class="form-check-input" type="radio" name="payment_method" id="paymentCash" value="Cash" checked>
                             <label class="form-check-label" for="paymentCash">Cash</label>
                           </div>
                         </div>
                         <div class="col-md-6 mb-2">
                           <div class="form-check">
-                            <input class="form-check-input" type="radio" name="payment_method" id="paymentCard" value="card">
+                            <input class="form-check-input" type="radio" name="payment_method" id="paymentCard" value="Credit/Debit Card">
                             <label class="form-check-label" for="paymentCard">Credit/Debit Card</label>
                           </div>
                         </div>
                         <div class="col-md-6 mb-2">
                           <div class="form-check">
-                            <input class="form-check-input" type="radio" name="payment_method" id="paymentBank" value="bank">
+                            <input class="form-check-input" type="radio" name="payment_method" id="paymentBank" value="Bank Transfer">
                             <label class="form-check-label" for="paymentBank">Bank Transfer</label>
                           </div>
                         </div>
                         <div class="col-md-6 mb-2">
                           <div class="form-check">
-                            <input class="form-check-input" type="radio" name="payment_method" id="paymentGcash" value="gcash">
-                            <label class="form-check-label" for="paymentGcash">Gcash</label>
+                            <input class="form-check-input" type="radio" name="payment_method" id="paymentGcash" value="GCash">
+                            <label class="form-check-label" for="paymentGcash">GCash</label>
                           </div>
                         </div>
                         <div class="col-md-6">
                           <div class="form-check">
-                            <input class="form-check-input" type="radio" name="payment_method" id="paymentPaymaya" value="paymaya">
-                            <label class="form-check-label" for="paymentPaymaya">Paymaya</label>
+                            <input class="form-check-input" type="radio" name="payment_method" id="paymentMaya" value="Maya">
+                            <label class="form-check-label" for="paymentMaya">Maya</label>
                           </div>
                         </div>
                       </div>

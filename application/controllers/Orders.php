@@ -99,16 +99,36 @@ class Orders extends Admin_Controller
 		// Generate pagination HTML
 		$pagination = '';
 		
+		// First page button
+		$first_disabled = ($page <= 1) ? 'disabled' : '';
+		$pagination .= '<li class="page-item ' . $first_disabled . '">
+							<a href="#" class="page-link" data-page="1">
+								<i class="ti ti-chevrons-left"></i>
+							</a>
+						</li>';
+		
 		// Previous button
 		$prev_disabled = ($page <= 1) ? 'disabled' : '';
 		$pagination .= '<li class="page-item ' . $prev_disabled . '">
 							<a href="#" class="page-link" data-page="' . ($page - 1) . '">
-								<i class="ti ti-chevrons-left"></i>
+								Previous
 							</a>
 						</li>';
 
-		// Page numbers
-		for ($i = 1; $i <= $total_pages; $i++) {
+		// Page numbers - show only up to 5 pages
+		$startPage = max(1, $page - 2);
+		$endPage = min($total_pages, $page + 2);
+
+		// Adjust for edge cases
+		if ($page <= 3) {
+			$endPage = min(5, $total_pages);
+		}
+		if ($page > $total_pages - 2) {
+			$startPage = max($total_pages - 4, 1);
+		}
+
+		// Generate page number links
+		for ($i = $startPage; $i <= $endPage; $i++) {
 			$active = ($i == $page) ? 'active' : '';
 			$pagination .= '<li class="page-item ' . $active . '">
 							<a href="#" class="page-link" data-page="' . $i . '">' . $i . '</a>
@@ -119,6 +139,14 @@ class Orders extends Admin_Controller
 		$next_disabled = ($page >= $total_pages) ? 'disabled' : '';
 		$pagination .= '<li class="page-item ' . $next_disabled . '">
 							<a href="#" class="page-link" data-page="' . ($page + 1) . '">
+								Next
+							</a>
+						</li>';
+		
+		// Last page button
+		$last_disabled = ($page >= $total_pages) ? 'disabled' : '';
+		$pagination .= '<li class="page-item ' . $last_disabled . '">
+							<a href="#" class="page-link" data-page="' . $total_pages . '">
 								<i class="ti ti-chevrons-right"></i>
 							</a>
 						</li>';
@@ -323,7 +351,18 @@ class Orders extends Admin_Controller
             $order_ids = is_array($order_id) ? $order_id : array($order_id);
             
             $success = true;
+            $deleted_orders = array();
+            
             foreach($order_ids as $id) {
+                // Get order details before deletion
+                $order_data = $this->model_orders->getOrdersData($id);
+                if($order_data) {
+                    $deleted_orders[] = array(
+                        'id' => $id,
+                        'order_no' => $order_data['order_no']
+                    );
+                }
+                
                 $delete = $this->model_orders->remove($id);
                 if(!$delete) {
                     $success = false;
@@ -333,9 +372,18 @@ class Orders extends Admin_Controller
             
             if($success) {
                 $response['success'] = true;
-                $response['messages'] = count($order_ids) > 1 ? 
-                    "Successfully removed ".count($order_ids)." orders" : 
-                    "Successfully removed";
+                
+                if(count($order_ids) == 1) {
+                    // Single order deletion
+                    $response['messages'] = "Successfully removed order " . $deleted_orders[0]['order_no'];
+                    $response['order_no'] = $deleted_orders[0]['order_no'];
+                } else {
+                    // Multiple order deletion
+                    $response['messages'] = "Successfully removed " . count($order_ids) . " orders";
+                    $response['order_count'] = count($order_ids);
+                }
+                
+                $response['deleted_orders'] = $deleted_orders;
             } else {
                 $response['success'] = false;
                 $response['messages'] = "Error in the database while removing the order(s)";
@@ -352,145 +400,289 @@ class Orders extends Admin_Controller
 	* It gets the product id and fetch the order data. 
 	* The order print logic is done here 
 	*/
-	public function printDiv($id)
+	public function receipt($order_no)
 	{
 		if(!in_array('viewOrder', $this->permission)) {
             redirect('dashboard', 'refresh');
         }
         
-		if($id) {
-			$order_data = $this->model_orders->getOrdersData($id);
-			$orders_items = $this->model_orders->getOrdersItemData($id);
+		if($order_no) {
+			// Get order ID by order_no
+			$this->db->where('order_no', $order_no);
+			$order_query = $this->db->get('orders');
+			
+			if($order_query->num_rows() == 0) {
+				$this->session->set_flashdata('error', 'Order not found');
+				redirect('orders', 'refresh');
+			}
+			
+			$order_row = $order_query->row();
+			$order_id = $order_row->id;
+			
+			$order_data = $this->model_orders->getOrdersData($order_id);
+			$orders_items = $this->model_orders->getOrdersItemData($order_id);
 			$company_info = $this->model_company->getCompanyData(1);
 
 			$order_date = date('d/m/Y', $order_data['date_time']);
 			$paid_status = ($order_data['paid_status'] == 1) ? "Paid" : "Unpaid";
 
-			$html = '<!-- Main content -->
-			<!DOCTYPE html>
-			<html>
+			$html = '<!DOCTYPE html>
+			<html lang="en">
 			<head>
 			  <meta charset="utf-8">
 			  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-			  <title>AdminLTE 2 | Invoice</title>
-			  <!-- Tell the browser to be responsive to screen width -->
+			  <title>Receipt - '.$order_no.'</title>
 			  <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport">
-			  <!-- Bootstrap 3.3.7 -->
-			  <link rel="stylesheet" href="'.base_url('assets/bower_components/bootstrap/dist/css/bootstrap.min.css').'">
-			  <!-- Font Awesome -->
-			  <link rel="stylesheet" href="'.base_url('assets/bower_components/font-awesome/css/font-awesome.min.css').'">
-			  <link rel="stylesheet" href="'.base_url('assets/dist/css/AdminLTE.min.css').'">
+			  <link rel="shortcut icon" href="'.base_url('assets/images/FullLogo_Transparent.png').'">
+			  <link rel="preconnect" href="https://fonts.googleapis.com">
+			  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+			  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+			  <link rel="stylesheet" href="'.base_url('assets/css/app.min.css').'" rel="stylesheet" type="text/css">
+			  
+			  <style>
+				body {
+				  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+				  line-height: 1.5;
+				  color: #333;
+				  background-color: #f8f9fa;
+				  margin: 0;
+				  padding: 0;
+				  -webkit-print-color-adjust: exact !important;
+				  print-color-adjust: exact !important;
+				}
+				.receipt-container {
+				  max-width: 800px;
+				  margin: 0 auto;
+				  background: white;
+				  padding: 40px;
+				  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.05);
+				  border-radius: 0.5rem;
+				}
+				.receipt-header {
+				  border-bottom: 1px solid #e9ecef;
+				  margin-bottom: 30px;
+				  padding-bottom: 20px;
+				}
+				.company-name {
+				  font-weight: 700;
+				  font-size: 1.75rem;
+				  color: #212529;
+				  margin-bottom: 5px;
+				}
+				.receipt-title {
+				  font-size: 1.2rem;
+				  font-weight: 600;
+				  color: #495057;
+				  margin-bottom: 20px;
+				}
+				.receipt-info {
+				  margin-bottom: 30px;
+				}
+				.info-block {
+				  margin-bottom: 15px;
+				}
+				.info-label {
+				  font-weight: 600;
+				  color: #6c757d;
+				  margin-right: 10px;
+				}
+				.info-value {
+				  font-weight: 500;
+				  color: #212529;
+				}
+				.receipt-table {
+				  width: 100%;
+				  margin-bottom: 30px;
+				  border-collapse: collapse;
+				}
+				.receipt-table th {
+				  background-color: #f8f9fa;
+				  padding: 12px 15px;
+				  font-weight: 600;
+				  text-align: left;
+				  color: #495057;
+				  border-bottom: 2px solid #dee2e6;
+				}
+				.receipt-table td {
+				  padding: 12px 15px;
+				  border-bottom: 1px solid #e9ecef;
+				}
+				.receipt-table tr:last-child td {
+				  border-bottom: none;
+				}
+				.receipt-total {
+				  font-weight: 700;
+				  background-color: #f8f9fa;
+				  border-top: 2px solid #dee2e6;
+				}
+				.receipt-footer {
+				  margin-top: 40px;
+				  text-align: center;
+				  font-size: 0.875rem;
+				  color: #6c757d;
+				  border-top: 1px solid #e9ecef;
+				  padding-top: 20px;
+				}
+				.badge {
+				  display: inline-block;
+				  padding: 0.35em 0.65em;
+				  font-size: 0.75em;
+				  font-weight: 600;
+				  line-height: 1;
+				  text-align: center;
+				  white-space: nowrap;
+				  vertical-align: baseline;
+				  border-radius: 0.25rem;
+				}
+				.badge-success {
+				  color: #fff;
+				  background-color: #198754;
+				}
+				.badge-danger {
+				  color: #fff;
+				  background-color: #dc3545;
+				}
+				.totals-section {
+				  margin-left: auto;
+				  width: 50%;
+				}
+				.totals-row {
+				  display: flex;
+				  justify-content: space-between;
+				  padding: 8px 0;
+				  border-bottom: 1px solid #e9ecef;
+				}
+				.totals-row:last-child {
+				  border-bottom: none;
+				  font-weight: 700;
+				}
+				.total-label {
+				  color: #6c757d;
+				  font-weight: 600;
+				}
+				.total-value {
+				  text-align: right;
+				}
+				.receipt-number {
+				  font-size: 1rem;
+				  font-weight: 600;
+				  padding: 6px 12px;
+				  background-color: #f8f9fa;
+				  border-radius: 4px;
+				  display: inline-block;
+				  margin-bottom: 10px;
+				}
+				@media print {
+				  body {
+					padding: 0;
+					background: white;
+				  }
+				  .receipt-container {
+					box-shadow: none;
+					padding: 20px;
+					max-width: 100%;
+				  }
+				}
+			  </style>
 			</head>
 			<body onload="window.print();">
-			
-			<div class="wrapper">
-			  <section class="invoice">
-			    <!-- title row -->
-			    <div class="row">
-			      <div class="col-xs-12">
-			        <h2 class="page-header">
-			          '.$company_info['company_name'].'
-			          <small class="pull-right">Date: '.$order_date.'</small>
-			        </h2>
-			      </div>
-			      <!-- /.col -->
-			    </div>
-			    <!-- info row -->
-			    <div class="row invoice-info">
-			      
-			      <div class="col-sm-4 invoice-col">
-			        
-			        <b>Order No:</b> '.$order_data['order_no'].'<br>
-			        <b>Payment Method:</b> '.ucfirst($order_data['payment_method']).'
-			      </div>
-			      <!-- /.col -->
-			    </div>
-			    <!-- /.row -->
+				<div class="receipt-container">
+					<div class="receipt-header">
+						<div class="d-flex justify-content-between align-items-center">
+							<div>
+								<div class="company-logo" style="margin-bottom: 15px;">
+									<img src="'.base_url('assets/images/invengo.png').'" alt="'.$company_info['company_name'].'" height="60" width="80%">
+								</div>
+								<div class="receipt-title">Payment Receipt</div>
+							</div>
+							<div class="text-end">
+								<div class="receipt-number">#'.$order_data['order_no'].'</div>
+								<div class="text-muted">Date: '.$order_date.'</div>
+							</div>
+						</div>
+					</div>
+					
+					<div class="receipt-info row">
+						<div class="col-md-6">
+							<div class="info-block">
+								<span class="info-label">Payment Method:</span>
+								<span class="info-value">'.ucfirst($order_data['payment_method']).'</span>
+							</div>
+							<div class="info-block">
+								<span class="info-label">Status:</span>
+								<span class="info-value">
+									'.($paid_status == "Paid" ? 
+										'<span class="badge badge-soft-success">Paid</span>' : 
+										'<span class="badge badge-danger">Unpaid</span>').'
+								</span>
+							</div>
+						</div>
+					</div>
+					
+					<table class="receipt-table">
+						<thead>
+							<tr>
+								<th>Item</th>
+								<th style="text-align: center;">Quantity</th>
+								<th style="text-align: right;">Price</th>
+								<th style="text-align: right;">Amount</th>
+							</tr>
+						</thead>
+						<tbody>';
 
-			    <!-- Table row -->
-			    <div class="row">
-			      <div class="col-xs-12 table-responsive">
-			        <table class="table table-striped">
-			          <thead>
-			          <tr>
-			            <th>Product name</th>
-			            <th>Price</th>
-			            <th>Qty</th>
-			            <th>Amount</th>
-			          </tr>
-			          </thead>
-			          <tbody>'; 
+						foreach ($orders_items as $k => $v) {
+							$product_data = $this->model_products->getProductData($v['product_id']); 
+							
+							$html .= '<tr>
+								<td>'.$product_data['name'].'</td>
+								<td style="text-align: center;">'.$v['qty'].'</td>
+								<td style="text-align: right;">₱'.number_format(floatval($v['rate']), 2).'</td>
+								<td style="text-align: right;">₱'.number_format(floatval($v['amount']), 2).'</td>
+							</tr>';
+						}
+						
+						$html .= '</tbody>
+					</table>
+					
+					<div class="totals-section">
+						<div class="totals-row">
+							<div class="total-label">Gross Amount:</div>
+							<div class="total-value">₱'.number_format(floatval($order_data['gross_amount']), 2).'</div>
+						</div>';
 
-			          foreach ($orders_items as $k => $v) {
+						if($order_data['service_charge'] > 0) {
+							$html .= '<div class="totals-row">
+								<div class="total-label">Service Charge ('.$order_data['service_charge_rate'].'%):</div>
+								<div class="total-value">₱'.number_format(floatval($order_data['service_charge']), 2).'</div>
+							</div>';
+						}
 
-			          	$product_data = $this->model_products->getProductData($v['product_id']); 
-			          	
-			          	$html .= '<tr>
-				            <td>'.$product_data['name'].'</td>
-				            <td>'.$v['rate'].'</td>
-				            <td>'.$v['qty'].'</td>
-				            <td>'.$v['amount'].'</td>
-			          	</tr>';
-			          }
-			          
-			          $html .= '</tbody>
-			        </table>
-			      </div>
-			      <!-- /.col -->
-			    </div>
-			    <!-- /.row -->
+						if($order_data['vat_charge'] > 0) {
+							$html .= '<div class="totals-row">
+								<div class="total-label">VAT ('.$order_data['vat_charge_rate'].'%):</div>
+								<div class="total-value">₱'.number_format(floatval($order_data['vat_charge']), 2).'</div>
+							</div>';
+						}
+						
+						$html .= '<div class="totals-row">
+							<div class="total-label">Discount:</div>
+							<div class="total-value">₱'.number_format(floatval($order_data['discount']), 2).'</div>
+						</div>
+						<div class="totals-row">
+							<div class="total-label">Total Amount:</div>
+							<div class="total-value">₱'.number_format(floatval($order_data['net_amount']), 2).'</div>
+						</div>
+					</div>
+					
+					<div class="receipt-footer">
+						<p>Thank you for your purchase!</p>
+						<p>'.$company_info['company_name'].' &copy; '.date('Y').'</p>
+					</div>
+				</div>
+			</body>
+			</html>';
 
-			    <div class="row">
-			      
-			      <div class="col-xs-6 pull pull-right">
-
-			        <div class="table-responsive">
-			          <table class="table">
-			            <tr>
-			              <th style="width:50%">Gross Amount:</th>
-			              <td>'.$order_data['gross_amount'].'</td>
-			            </tr>';
-
-			            if($order_data['service_charge'] > 0) {
-			            	$html .= '<tr>
-				              <th>Service Charge ('.$order_data['service_charge_rate'].'%)</th>
-				              <td>'.$order_data['service_charge'].'</td>
-				            </tr>';
-			            }
-
-			            if($order_data['vat_charge'] > 0) {
-			            	$html .= '<tr>
-				              <th>Vat Charge ('.$order_data['vat_charge_rate'].'%)</th>
-				              <td>'.$order_data['vat_charge'].'</td>
-				            </tr>';
-			            }
-			            
-			            
-			            $html .=' <tr>
-			              <th>Discount:</th>
-			              <td>'.$order_data['discount'].'</td>
-			            </tr>
-			            <tr>
-			              <th>Net Amount:</th>
-			              <td>'.$order_data['net_amount'].'</td>
-			            </tr>
-			            <tr>
-			              <th>Paid Status:</th>
-			              <td>'.$paid_status.'</td>
-			            </tr>
-			          </table>
-			        </div>
-			      </div>
-			      <!-- /.col -->
-			    </div>
-			    <!-- /.row -->
-			  </section>
-			  <!-- /.content -->
-			</div>
-		</body>
-	</html>';
-
-			  echo $html;
+			echo $html;
 		}
 	}
 

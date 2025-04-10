@@ -50,8 +50,8 @@
                                     <ul class="dropdown-menu">
                                         <?php if(in_array('viewOrder', $user_permission)): ?>
                                             <li>
-                                                <a class="dropdown-item d-flex align-items-center" href="#" onclick="viewSelectedOrders(); return false;">
-                                                    <i class="ti ti-eye me-2"></i> View
+                                                <a class="dropdown-item d-flex align-items-center" href="#" onclick="viewReceipt(); return false;">
+                                                    <i class="ti ti-printer me-2"></i> Print Receipt
                                                 </a>
                                             </li>
                                         <?php endif; ?>
@@ -111,20 +111,36 @@
 <?php if(in_array('deleteOrder', $user_permission)): ?>
 <!-- remove order modal -->
 <div class="modal fade" tabindex="-1" role="dialog" id="removeModal">
-    <div class="modal-dialog">
-        <div class="modal-content modal-filled bg-danger">
-            <div class="modal-header">
-                <h4 class="modal-title">Delete Order</h4>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-0 pb-0">
+                <h4 class="modal-title text-danger" id="removeModalTitle">
+                    <i class="ti ti-trash me-2"></i>Delete Order
+                </h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form role="form" action="<?php echo base_url('orders/remove') ?>" method="post" id="removeForm">
-                <div class="modal-body">
-                    <p>Are you sure you want to delete this order?</p>
-                    <p>This action cannot be undone.</p>
+            <form role="form" id="removeForm">
+                <div class="modal-body text-center py-4">
+                    <div class="mb-4">
+                        <div class="avatar-lg mx-auto">
+                            <div class="avatar-title bg-danger-subtle text-danger rounded-circle">
+                                <i class="ti ti-trash fs-24"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="deleteModalMessageContainer" class="text-muted mb-4">
+                        <p id="removeModalMessage" class="fs-5 mb-0">Are you sure you want to delete this order?</p>
+                        <p class="mt-2 mb-0">This action cannot be undone.</p>
+                    </div>
+                    <input type="hidden" id="removeOrderIds">
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-info" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-dark">Delete</button>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">
+                        <i class="ti ti-x me-1"></i>Cancel
+                    </button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="ti ti-trash me-1"></i>Delete
+                    </button>
                 </div>
             </form>
         </div>
@@ -134,7 +150,7 @@
 
 <!-- Edit Order Modal -->
 <div id="editOrderModal" class="modal fade" tabindex="-1" role="dialog">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
                 <h4 class="modal-title">Edit Order</h4>
@@ -157,26 +173,26 @@
                                     </div>
                                     <div class="col-md-6 mb-2">
                                         <div class="form-check">
-                                            <input class="form-check-input" type="radio" name="edit_payment_method" id="edit_paymentCard" value="Card">
+                                            <input class="form-check-input" type="radio" name="edit_payment_method" id="edit_paymentCard" value="Credit/Debit Card">
                                             <label class="form-check-label" for="edit_paymentCard">Credit/Debit Card</label>
                                         </div>
                                     </div>
                                     <div class="col-md-6 mb-2">
                                         <div class="form-check">
-                                            <input class="form-check-input" type="radio" name="edit_payment_method" id="edit_paymentBank" value="Bank">
+                                            <input class="form-check-input" type="radio" name="edit_payment_method" id="edit_paymentBank" value="Bank Transfer">
                                             <label class="form-check-label" for="edit_paymentBank">Bank Transfer</label>
                                         </div>
                                     </div>
                                     <div class="col-md-6 mb-2">
                                         <div class="form-check">
-                                            <input class="form-check-input" type="radio" name="edit_payment_method" id="edit_paymentGcash" value="Gcash">
-                                            <label class="form-check-label" for="edit_paymentGcash">Gcash</label>
+                                            <input class="form-check-input" type="radio" name="edit_payment_method" id="edit_paymentGcash" value="GCash">
+                                            <label class="form-check-label" for="edit_paymentGcash">GCash</label>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
                                         <div class="form-check">
-                                            <input class="form-check-input" type="radio" name="edit_payment_method" id="edit_paymentPaymaya" value="Paymaya">
-                                            <label class="form-check-label" for="edit_paymentPaymaya">Paymaya</label>
+                                            <input class="form-check-input" type="radio" name="edit_payment_method" id="edit_paymentMaya" value="Maya">
+                                            <label class="form-check-label" for="edit_paymentMaya">Maya</label>
                                         </div>
                                     </div>
                                 </div>
@@ -205,6 +221,15 @@
 <script type="text/javascript">
 var base_url = "<?php echo base_url(); ?>";
 var user_permission = <?php echo json_encode($user_permission); ?>;
+
+// Function to auto-dismiss alert messages
+function autoDismissMessages() {
+    setTimeout(function() {
+        $(".alert").fadeOut(500, function() {
+            $(this).remove();
+        });
+    }, 5000); // 5 seconds
+}
 
 $(document).ready(function() {
     $("#mainOrdersNav").addClass('active');
@@ -246,6 +271,15 @@ $(document).ready(function() {
             $('#checkAll').prop('checked', false);
         }
         toggleOrderActions();
+    });
+    
+    // Handle pagination clicks
+    $(document).on('click', '.pagination .page-link', function(e) {
+        e.preventDefault();
+        var page = $(this).data('page');
+        if (page) {
+            loadOrderTable(page, $('#searchBox').val());
+        }
     });
 
     // Handle dropdown menu items
@@ -306,7 +340,7 @@ $(document).ready(function() {
         } else if(action === 'Delete') {
             removeSelectedOrders();
         } else if(action === 'View') {
-            viewSelectedOrders();
+            viewReceipt();
         }
     });
 });
@@ -316,6 +350,17 @@ function toggleOrderActions() {
     var checkedCount = $('.order-check:checked').length;
     if (checkedCount > 0) {
         $('.order-actions').show();
+        
+        // Hide or show Print Receipt and Edit based on selection count
+        if (checkedCount === 1) {
+            // Show Print Receipt and Edit options when exactly one order is selected
+            $('.dropdown-menu a:contains("Print Receipt")').parent().show();
+            $('.dropdown-menu a:contains("Edit")').parent().show();
+        } else {
+            // Hide Print Receipt and Edit options when multiple orders are selected
+            $('.dropdown-menu a:contains("Print Receipt")').parent().hide();
+            $('.dropdown-menu a:contains("Edit")').parent().hide();
+        }
     } else {
         $('.order-actions').hide();
     }
@@ -331,10 +376,13 @@ function getSelectedOrderIds() {
 }
 
 // Function to view selected orders
-function viewSelectedOrders() {
+function viewReceipt() {
     var orderIds = getSelectedOrderIds();
     if (orderIds.length === 1) {
-        window.location.href = base_url + 'orders/printDiv/' + orderIds[0];
+        // Get the order number for the selected order
+        var selectedRow = $('.order-check:checked').closest('tr');
+        var orderNo = selectedRow.find('td:eq(1)').text(); // Get the order number from the second column
+        window.location.href = base_url + 'orders/receipt/' + orderNo;
     } else {
         alert('Please select only one order to view');
     }
@@ -344,34 +392,29 @@ function viewSelectedOrders() {
 function removeSelectedOrders() {
     var orderIds = getSelectedOrderIds();
     if (orderIds.length > 0) {
-        if(confirm('Are you sure you want to delete the selected orders?')) {
-            $.ajax({
-                url: base_url + 'orders/remove',
-                type: 'post',
-                data: { order_id: orderIds },
-                dataType: 'json',
-                success: function(response) {
-                    if(response.success) {
-                        $("#messages").html(`
-                            <div class="alert alert-success text-bg-success alert-dismissible d-flex align-items-center" role="alert">
-                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
-                                <iconify-icon icon="solar:check-read-line-duotone" class="fs-20 me-1"></iconify-icon>
-                                <div class="lh-1">${response.messages}</div>
-                            </div>
-                        `);
-                        loadOrderTable();
-                    } else {
-                        $("#messages").html(`
-                            <div class="alert alert-danger text-bg-danger alert-dismissible d-flex align-items-center" role="alert">
-                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
-                                <iconify-icon icon="solar:danger-triangle-bold-duotone" class="fs-20 me-1"></iconify-icon>
-                                <div class="lh-1">${response.messages}</div>
-                            </div>
-                        `);
-                    }
-                }
-            });
+        // Get order numbers for the selected orders
+        let orderNumbers = [];
+        $(".order-check:checked").each(function() {
+            let orderNo = $(this).closest('tr').find('td:eq(1)').text().trim();
+            orderNumbers.push(orderNo);
+        });
+        
+        // Update modal title and message based on selection count
+        if (orderIds.length === 1) {
+            // Single order deletion
+            $("#removeModalTitle").html('<i class="ti ti-trash me-2"></i>Delete Order');
+            $("#removeModalMessage").html(`Are you sure you want to delete order <strong>${orderNumbers[0]}</strong>?`);
+        } else {
+            // Multiple order deletion
+            $("#removeModalTitle").html('<i class="ti ti-trash me-2"></i>Delete Multiple Orders');
+            $("#removeModalMessage").html(`Are you sure you want to delete <strong>${orderIds.length}</strong> selected orders?`);
         }
+        
+        // Set the order IDs to delete
+        $("#removeOrderIds").val(JSON.stringify(orderIds));
+        
+        // Show the modal
+        $("#removeModal").modal("show");
     } else {
         alert('Please select at least one order to delete');
     }
@@ -403,8 +446,8 @@ function loadOrderTable(page = 1, search = '') {
                         <td>${order.user_name ? order.user_name : 'N/A'}</td>
                         <td>
                             ${order.paid_status == 1 ? 
-                                '<span class="badge bg-success-subtle text-success">Paid</span>' : 
-                                '<span class="badge bg-danger-subtle text-danger">Unpaid</span>'
+                                '<span class="badge badge-outline-success">Paid</span>' : 
+                                '<span class="badge badge-outline-danger">Unpaid</span>'
                             }
                         </td>
                     </tr>`;
@@ -417,50 +460,17 @@ function loadOrderTable(page = 1, search = '') {
             
             // Update pagination if provided
             if (response && response.data && response.data.length > 0) {
-                // Update pagination status
-                const start = (page - 1) * 10 + 1;
-                const end = Math.min(start + response.data.length - 1, response.data.length);
-                const total = response.data.length;
-                
-                $(".text-muted").html(`
-                    Showing ${start} to ${end} of ${total} orders
-                `).fadeIn();
-
-                // Generate pagination
-                let totalPages = Math.ceil(total / 10);
-                let paginationHtml = '';
-                
-                // Always show pagination container
-                $(".pagination").show();
-                
-                // Previous button
-                paginationHtml += `
-                    <li class="page-item ${page <= 1 ? 'disabled' : ''}">
-                        <a class="page-link" href="javascript:void(0);" onclick="loadOrderTable(${page - 1}, '${search}')">
-                            Previous
-                        </a>
-                    </li>
-                `;
-                
-                // Page numbers
-                for(let i = 1; i <= totalPages; i++) {
-                    paginationHtml += `
-                        <li class="page-item ${i === parseInt(page) ? 'active' : ''}">
-                            <a class="page-link" href="javascript:void(0);" onclick="loadOrderTable(${i}, '${search}')">${i}</a>
-                        </li>
-                    `;
+                // Update pagination status using the range_info from server
+                if (response.range_info) {
+                    $(".card-footer .text-muted").html(response.range_info).fadeIn();
                 }
                 
-                // Next button
-                paginationHtml += `
-                    <li class="page-item ${page >= totalPages ? 'disabled' : ''}">
-                        <a class="page-link" href="javascript:void(0);" onclick="loadOrderTable(${page + 1}, '${search}')">
-                            Next
-                        </a>
-                    </li>
-                `;
+                // Use server-provided pagination if available
+                if (response.pagination) {
+                    $(".pagination").html(response.pagination);
+                    $(".pagination").show();
+                }
                 
-                $(".pagination").html(paginationHtml);
                 $("#productFooter").show();
             } else {
                 $("#manageTable tbody").html(`
@@ -468,7 +478,7 @@ function loadOrderTable(page = 1, search = '') {
                         <td colspan="8" class="text-center">No orders found</td>
                     </tr>
                 `);
-                $(".text-muted").html('Showing 0 to 0 of 0 entries').fadeIn();
+                $(".card-footer .text-muted").html('Showing 0 to 0 of 0 orders').fadeIn();
                 $(".pagination").html('');
                 $("#productFooter").show();
             }
@@ -492,6 +502,68 @@ function loadOrderTable(page = 1, search = '') {
     });
 }
 
+// Handle delete request
+$('#removeForm').on('submit', function(e) {
+    e.preventDefault();
+    var orderIds = JSON.parse($('#removeOrderIds').val());
+    
+    $.ajax({
+        url: base_url + "orders/remove",
+        type: 'POST',
+        data: { order_id: orderIds },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                $('#removeModal').modal('hide');
+                
+                // Create success message based on response data
+                let successMessage = '';
+                if (response.order_no) {
+                    // Single order deletion
+                    successMessage = `Order <strong>${response.order_no}</strong> was successfully deleted`;
+                } else if (response.order_count) {
+                    // Multiple order deletion
+                    successMessage = `<strong>${response.order_count}</strong> orders were successfully deleted`;
+                } else {
+                    // Fallback if response format changes
+                    successMessage = response.messages;
+                }
+                
+                $('#messages').html(`
+                    <div class="alert alert-success text-bg-success alert-dismissible d-flex align-items-center" role="alert">
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+                        <iconify-icon icon="solar:check-read-line-duotone" class="fs-20 me-1"></iconify-icon>
+                        <div class="lh-1">${successMessage}</div>
+                    </div>
+                `);
+                autoDismissMessages();
+                
+                // Refresh the table to show updated data
+                loadOrderTable();
+            } else {
+                $('#messages').html(`
+                    <div class="alert alert-danger text-bg-danger alert-dismissible d-flex align-items-center" role="alert">
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+                        <iconify-icon icon="solar:danger-triangle-bold-duotone" class="fs-20 me-1"></iconify-icon>
+                        <div class="lh-1">${response.messages}</div>
+                    </div>
+                `);
+                autoDismissMessages();
+            }
+        },
+        error: function() {
+            $('#messages').html(`
+                <div class="alert alert-danger text-bg-danger alert-dismissible d-flex align-items-center" role="alert">
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+                    <iconify-icon icon="solar:danger-triangle-bold-duotone" class="fs-20 me-1"></iconify-icon>
+                    <div class="lh-1">Error deleting order(s). Please try again.</div>
+                </div>
+            `);
+            autoDismissMessages();
+        }
+    });
+});
+
 // Handle order update
 $("#editOrderForm").submit(function(e) {
     e.preventDefault();
@@ -512,6 +584,7 @@ $("#editOrderForm").submit(function(e) {
                         <div class="lh-1">${response.messages}</div>
                     </div>
                 `);
+                autoDismissMessages();
                 loadOrderTable();
             } else {
                 $('#messages').html(`
@@ -521,6 +594,7 @@ $("#editOrderForm").submit(function(e) {
                         <div class="lh-1">${response.messages}</div>
                     </div>
                 `);
+                autoDismissMessages();
             }
         },
         error: function() {
@@ -531,6 +605,7 @@ $("#editOrderForm").submit(function(e) {
                     <div class="lh-1">Error updating order. Please try again.</div>
                 </div>
             `);
+            autoDismissMessages();
         }
     });
 });
