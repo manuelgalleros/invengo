@@ -7,7 +7,7 @@
       </div>
       <div class="text-end">
         <ol class="breadcrumb m-0 py-0">
-          <li class="breadcrumb-item"><a href="javascript: void(0);">Home</a></li>
+          <li class="breadcrumb-item"><a href="<?php echo base_url('dashboard') ?>">Home</a></li>
           <li class="breadcrumb-item active">Create New Order</li>
         </ol>
       </div>
@@ -52,7 +52,10 @@
                   <div class="d-flex gap-3 mb-3">
                     <div class="border-end pe-3">
                       <div class="text-muted small">Date</div>
-                      <div class="fw-medium" id="current-date"><?php echo date('F d, Y') ?></div>
+                      <div class="fw-medium" id="current-date"><?php 
+                        date_default_timezone_set('Asia/Manila');
+                        echo date('F j, Y'); 
+                      ?></div>
                     </div>
                     <div>
                       <div class="text-muted small">Time (PHT)</div>
@@ -235,7 +238,7 @@
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="cashPaymentModalLabel">Cash Payment</h5>
+        <h4 class="modal-title" id="cashPaymentModalLabel">Cash Payment</h4>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
@@ -360,12 +363,14 @@
     // Format the date in a more readable format
     function formatDate() {
       const date = new Date();
-      // Convert to Philippine time (UTC+8)
-      date.setTime(date.getTime() + (8 * 60 * 60 * 1000));
+      const options = { 
+        timeZone: 'Asia/Manila',
+        month: 'long', 
+        day: 'numeric', 
+        year: 'numeric' 
+      };
       
-      const options = { year: 'numeric', month: 'long', day: '2-digit', timeZone: 'UTC' };
-      const dateString = date.toLocaleDateString('en-US', options);
-      $("#current-date").text(dateString);
+      document.getElementById('current-date').textContent = date.toLocaleDateString('en-US', options);
     }
     
     formatDate();
@@ -540,15 +545,21 @@
       }
       
       // If payment method is cash, show cash payment modal
-      if ($('input[name="payment_method"]:checked').val() === 'cash') {
+      if ($('input[name="payment_method"]:checked').val() === 'Cash') {
         // Set the total amount in the modal
         $('#total_amount').val($('#net_amount').val());
         $('#cash_given').val('');
-        $('#change_amount').val('');
+        $('#change_amount').val('0.00');
         $('#cash-error').addClass('d-none');
+        $('#confirm_cash_payment').prop('disabled', true);
         
         // Show the modal
         $('#cashPaymentModal').modal('show');
+        
+        // Focus on the cash input
+        setTimeout(function() {
+          $('#cash_given').focus();
+        }, 500);
       } else {
         // For other payment methods, submit directly
         submitOrderForm();
@@ -559,10 +570,20 @@
     $('#cash_given').on('input', function() {
       calculateChange();
     });
-    
+
+    // Handle Enter key on cash input
+    $('#cash_given').on('keydown', function(e) {
+      if (e.key === 'Enter' || e.keyCode === 13) {
+        e.preventDefault();
+        if (!$('#confirm_cash_payment').prop('disabled')) {
+          $('#confirm_cash_payment').click();
+        }
+      }
+    });
+
     // Confirm cash payment
     $('#confirm_cash_payment').on('click', function() {
-      if (validateCashPayment()) {
+      if (!$(this).prop('disabled')) {
         // Add additional field to mark the order as paid
         const cashReceived = $('#cash_given').val();
         const changeAmount = $('#change_amount').val();
@@ -574,7 +595,7 @@
         submitOrderForm(true, cashReceived, changeAmount);
       }
     });
-    
+
     // Validate the order form
     function validateOrderForm() {
       // Check if at least one product is selected
@@ -610,25 +631,22 @@
       // Display change if positive, else zero
       $('#change_amount').val(change > 0 ? change.toFixed(2) : '0.00');
       
-      // Show/hide error message
+      // Show/hide error message and manage confirm button state
       if (cashGiven < totalAmount) {
         $('#cash-error').removeClass('d-none');
+        $('#confirm_cash_payment').prop('disabled', true);
       } else {
         $('#cash-error').addClass('d-none');
+        $('#confirm_cash_payment').prop('disabled', false);
       }
     }
     
-    // Validate cash payment
+    // Validate cash payment (for backward compatibility)
     function validateCashPayment() {
       let totalAmount = parseFloat($('#total_amount').val()) || 0;
       let cashGiven = parseFloat($('#cash_given').val()) || 0;
       
-      if (cashGiven < totalAmount) {
-        $('#cash-error').removeClass('d-none');
-        return false;
-      }
-      
-      return true;
+      return cashGiven >= totalAmount;
     }
     
     // Submit order form via AJAX
@@ -654,7 +672,7 @@
         }
       } else {
         // For non-cash methods, also mark as paid
-        if ($('input[name="payment_method"]:checked').val() !== 'cash') {
+        if ($('input[name="payment_method"]:checked').val() !== 'Cash') {
           submitData += '&paid_status=1';
         } else {
           // Cash payment without confirmation - mark as unpaid
@@ -682,8 +700,33 @@
               </div>
             `);
             
-            // Reset the form
-            resetOrderForm();
+            // Ask if user wants to print receipt
+            if (response.success && response.order_no) {
+
+              Swal.fire({
+              title: "Order Processed Successfully!",
+              text: "Would you like to print the receipt?",
+              icon: "success",
+              showCancelButton: true,
+              customClass: {
+                confirmButton: "btn btn-primary me-2 mt-2",
+                cancelButton: "btn btn-danger mt-2",
+              },
+              confirmButtonText: "Yes, Print",
+              cancelButtonText: 'No, Thanks',
+              buttonsStyling: !1,
+              showCloseButton: true,
+            }).then((result) => {
+                if (result.isConfirmed) {
+                  window.open(base_url + 'orders/receipt/' + response.order_no, '_blank');
+                }
+                resetOrderForm();
+              });
+
+            } else {
+              // Reset the form if no order number
+              resetOrderForm();
+            }
             
             // Initialize auto-dismiss for the alert
             initializeAutoDismissAlerts();
@@ -742,6 +785,50 @@
     }
   });
 
+  // Product functions - moved outside document ready to be globally accessible
+  function getProductData(row_id) {
+    var product_id = $("#product_" + row_id).val();    
+    if (product_id == "") {
+      $("#rate_" + row_id).val("");
+      $("#rate_value_" + row_id).val("");
+      $("#qty_" + row_id).val("");
+      $("#amount_" + row_id).val("");
+      $("#amount_value_" + row_id).val("");
+      $("#product_image_" + row_id).val("");
+      
+      return false;
+    }
+
+    $.ajax({
+      url: base_url + 'orders/getProductValueById',
+      type: 'post',
+      data: {product_id : product_id},
+      dataType: 'json',
+      success:function(response) {
+        // Setting the rate value
+        $("#rate_" + row_id).val(response.price);
+        $("#rate_value_" + row_id).val(response.price);
+        $("#product_image_" + row_id).val(response.image);
+        
+        // Set default quantity to 1
+        $("#qty_" + row_id).val(1);
+        
+        // Calculate the amount
+        var qty = 1;
+        var amount = Number(response.price) * qty;
+        $("#amount_" + row_id).val(amount.toFixed(2));
+        $("#amount_value_" + row_id).val(amount.toFixed(2));
+        
+        // Auto-focus on the quantity field for immediate editing
+        $("#qty_" + row_id).focus();
+        $("#qty_" + row_id).select();
+        
+        subAmount();
+        updateCartDisplay();
+      }
+    });
+  }
+
   function getTotal(row = null) {
     if(row) {
       var total = Number($("#rate_value_"+row).val()) * Number($("#qty_"+row).val());
@@ -750,65 +837,11 @@
       $("#amount_value_"+row).val(total);
       
       subAmount();
-
     } else {
       alert('no row !! please refresh the page');
     }
   }
 
-  // get the product information from the server
-  function getProductData(row_id)
-  {
-    var product_id = $("#product_"+row_id).val();    
-    if(product_id == "") {
-      $("#rate_"+row_id).val("");
-      $("#rate_value_"+row_id).val("");
-
-      $("#qty_"+row_id).val("");           
-
-      $("#amount_"+row_id).val("");
-      $("#amount_value_"+row_id).val("");
-      
-      // Clear image data
-      $("#product_image_"+row_id).val("");
-
-    } else {
-      $.ajax({
-        url: base_url + 'orders/getProductValueById',
-        type: 'post',
-        data: {product_id : product_id},
-        dataType: 'json',
-        success:function(response) {
-          // setting the rate value into the rate input field
-          
-          $("#rate_"+row_id).val(response.price);
-          $("#rate_value_"+row_id).val(response.price);
-
-          $("#qty_"+row_id).val(1);
-          $("#qty_value_"+row_id).val(1);
-
-          var total = Number(response.price) * 1;
-          total = total.toFixed(2);
-          $("#amount_"+row_id).val(total);
-          $("#amount_value_"+row_id).val(total);
-          
-          // Store the image path
-          if(response.image) {
-            $("#product_image_"+row_id).val(response.image);
-          } else {
-            $("#product_image_"+row_id).val("assets/images/product-default.jpg");
-          }
-          
-          subAmount();
-          
-          // Automatically set focus to the quantity field
-          $("#qty_"+row_id).focus().select();
-        } // /success
-      }); // /ajax function to fetch the product data 
-    }
-  }
-
-  // calculate the total amount of the order
   function subAmount() {
     var service_charge = <?php echo ($company_data['service_charge_value'] > 0) ? $company_data['service_charge_value']:0; ?>;
     var vat_charge = <?php echo ($company_data['vat_charge_value'] > 0) ? $company_data['vat_charge_value']:0; ?>;
@@ -821,7 +854,7 @@
       count = count.substring(4);
 
       totalSubAmount = Number(totalSubAmount) + Number($("#amount_"+count).val());
-    } // /for
+    }
 
     totalSubAmount = totalSubAmount.toFixed(2);
 
@@ -847,8 +880,6 @@
     // total amount
     var totalAmount = (Number(totalSubAmount) + Number(vat) + Number(service));
     totalAmount = totalAmount.toFixed(2);
-    // $("#net_amount").val(totalAmount);
-    // $("#totalAmountValue").val(totalAmount);
 
     var discount = $("#discount").val();
     if(discount) {
@@ -861,23 +892,19 @@
       $("#net_amount").val(totalAmount);
       $("#net_amount_value").val(totalAmount);
       $("#cart-net-amount").text("₱ " + totalAmount);
-    } // /else discount 
+    }
     
     // Update the cart display
     updateCartDisplay();
+  }
 
-  } // /sub total amount
-
-  function removeRow(tr_id)
-  {
+  function removeRow(tr_id) {
     $("#product_info_table tbody tr#row_"+tr_id).remove();
     subAmount();
   }
   
-  // Function to update cart display
   function updateCartDisplay() {
     var tableProductLength = $("#product_info_table tbody tr").length;
-    var cartHtml = '';
     var totalItems = 0;
     
     // Clear the cart items container

@@ -22,7 +22,7 @@
             </div>
             <div class="text-end">
                 <ol class="breadcrumb m-0 py-0">
-                    <li class="breadcrumb-item"><a href="javascript: void(0);">Home</a></li>
+                    <li class="breadcrumb-item"><a href="<?php echo base_url('dashboard') ?>">Home</a></li>
                     <li class="breadcrumb-item active">Manage Categories</li>
                 </ol>
             </div>

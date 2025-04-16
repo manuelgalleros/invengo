@@ -16,7 +16,16 @@ class Model_orders extends CI_Model
 			return $query->row_array();
 		}
 
-		$sql = "SELECT * FROM orders ORDER BY id DESC";
+		// Check if is_archived column exists before using it
+		$this->db->query("SHOW COLUMNS FROM orders LIKE 'is_archived'");
+		$column_exists = $this->db->affected_rows() > 0;
+
+		if($column_exists) {
+			$sql = "SELECT * FROM orders WHERE is_archived = 0 ORDER BY id DESC";
+		} else {
+			$sql = "SELECT * FROM orders ORDER BY id DESC";
+		}
+		
 		$query = $this->db->query($sql);
 		return $query->result_array();
 	}
@@ -157,8 +166,6 @@ class Model_orders extends CI_Model
 		}
 	}
 
-
-
 	public function remove($id)
 	{
 		if($id) {
@@ -167,7 +174,7 @@ class Model_orders extends CI_Model
 
 			$this->db->where('order_id', $id);
 			$delete_item = $this->db->delete('orders_item');
-			return ($delete == true && $delete_item) ? true : false;
+			return ($delete == true && $delete_item == true) ? true : false;
 		}
 	}
 
@@ -176,6 +183,67 @@ class Model_orders extends CI_Model
 		$sql = "SELECT * FROM orders WHERE paid_status = ?";
 		$query = $this->db->query($sql, array(1));
 		return $query->num_rows();
+	}
+
+	/*
+	* Archive an order by setting is_archived to 1
+	*/
+	public function archive($id)
+	{
+		// Check if is_archived column exists
+		$this->db->query("SHOW COLUMNS FROM orders LIKE 'is_archived'");
+		if($this->db->affected_rows() == 0) {
+			return false;
+		}
+		
+		// Set timezone to Philippine Standard Time
+		date_default_timezone_set('Asia/Manila');
+		
+		// Get the current user ID
+		$user_id = $this->session->userdata('id');
+		
+		$data = array(
+			'is_archived' => 1,
+			'archived_at' => time(),
+			'archived_by' => $user_id
+		);
+		
+		// Handle both single ID and array of IDs
+		if (is_array($id)) {
+			$this->db->where_in('id', $id);
+		} else {
+			$this->db->where('id', $id);
+		}
+		
+		$update = $this->db->update('orders', $data);
+		return ($update == true) ? true : false;
+	}
+	
+	/*
+	* Restore an order by setting is_archived to 0
+	*/
+	public function restore($id)
+	{
+		// Check if is_archived column exists
+		$this->db->query("SHOW COLUMNS FROM orders LIKE 'is_archived'");
+		if($this->db->affected_rows() == 0) {
+			return false;
+		}
+		
+		$data = array(
+			'is_archived' => 0,
+			'archived_at' => null
+		);
+		
+		// Handle both single ID and array of IDs
+		if (is_array($id)) {
+			$this->db->where_in('id', $id);
+		} else {
+			$this->db->where('id', $id);
+		}
+		
+		$update = $this->db->update('orders', $data);
+		return ($update == true) ? true : false;
 	}
 
 }

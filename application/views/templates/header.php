@@ -16,6 +16,12 @@
     <link href="<?php echo base_url()?>assets/vendor/quill/quill.snow.css" rel="stylesheet" type="text/css" />
     <script src="<?php echo base_url()?>assets/vendor/dropzone/dropzone-min.js"></script>
 
+    <!-- Sweet Alert css-->
+    <link href="<?php echo base_url()?>assets/vendor/sweetalert2/sweetalert2.min.css" rel="stylesheet" type="text/css">
+
+    <!-- Sweet Alerts js -->
+    <script src="<?php echo base_url()?>assets/vendor/sweetalert2/sweetalert2.min.js"></script>
+
     <!-- jQuery -->
     <script src="<?php echo base_url()?>assets/js/vendor.min.js"></script>
 

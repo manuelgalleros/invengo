@@ -7,7 +7,7 @@
             </div>
             <div class="text-end">
                 <ol class="breadcrumb m-0 py-0">
-                    <li class="breadcrumb-item"><a href="javascript: void(0);">Home</a></li>
+                    <li class="breadcrumb-item"><a href="<?php echo base_url('dashboard') ?>">Home</a></li>
                     <li class="breadcrumb-item active">Orders</li>
                 </ol>
             </div>
@@ -43,6 +43,9 @@
                                 <?php if(in_array('createOrder', $user_permission)): ?>
                                     <a href="<?php echo base_url('orders/create') ?>" class="btn btn-soft-info"><i class="ti ti-plus me-1"></i> Create New Order</a>
                                 <?php endif; ?>
+                                <?php if(in_array('viewArchivedOrder', $user_permission)): ?>
+                                    <a href="<?php echo base_url('orders/archive') ?>" class="btn btn-soft-warning"><i class="ti ti-archive me-1"></i> View Archives</a>
+                                <?php endif; ?>
                                 <div class="dropdown order-actions" style="display: none !important;">
                                     <button type="button" class="btn btn-danger dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
                                         <i class="ti ti-settings me-1"></i> Actions
@@ -62,8 +65,8 @@
                                         <?php endif; ?>
                                         <?php if(in_array('deleteOrder', $user_permission)): ?>
                                             <li>
-                                                <a class="dropdown-item d-flex align-items-center text-danger" href="#" onclick="removeSelectedOrders(); return false;">
-                                                    <i class="ti ti-trash me-2"></i> Delete
+                                                <a class="dropdown-item d-flex align-items-center text-warning" href="#" onclick="archiveSelectedOrders(); return false;">
+                                                    <i class="ti ti-archive me-2"></i> Archive
                                                 </a>
                                             </li>
                                         <?php endif; ?>
@@ -218,6 +221,44 @@
     </div>
 </div>
 
+<!-- Change the remove modal to archive modal -->
+<div class="modal fade" tabindex="-1" role="dialog" id="archiveModal">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-0 pb-0">
+                <h4 class="modal-title text-warning" id="archiveModalTitle">
+                    <i class="ti ti-archive me-2"></i>Archive Order
+                </h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form role="form" id="archiveForm">
+                <div class="modal-body text-center py-4">
+                    <div class="mb-4">
+                        <div class="avatar-lg mx-auto">
+                            <div class="avatar-title bg-warning-subtle text-warning rounded-circle">
+                                <i class="ti ti-archive fs-24"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="archiveModalMessageContainer" class="text-muted mb-4">
+                        <p id="archiveModalMessage" class="fs-5 mb-0">Are you sure you want to archive this order?</p>
+                        <p class="mt-2 mb-0">Archived orders can be viewed in the Archives section.</p>
+                    </div>
+                    <input type="hidden" id="archiveOrderIds">
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">
+                        <i class="ti ti-x me-1"></i>Cancel
+                    </button>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="ti ti-archive me-1"></i>Archive
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script type="text/javascript">
 var base_url = "<?php echo base_url(); ?>";
 var user_permission = <?php echo json_encode($user_permission); ?>;
@@ -337,9 +378,9 @@ $(document).ready(function() {
                     }
                 });
             }
-        } else if(action === 'Delete') {
-            removeSelectedOrders();
-        } else if(action === 'View') {
+        } else if(action === 'Archive') {
+            archiveSelectedOrders();
+        } else if(action === 'Print Receipt') {
             viewReceipt();
         }
     });
@@ -388,8 +429,8 @@ function viewReceipt() {
     }
 }
 
-// Function to remove selected orders
-function removeSelectedOrders() {
+// Function to archive selected orders
+function archiveSelectedOrders() {
     var orderIds = getSelectedOrderIds();
     if (orderIds.length > 0) {
         // Get order numbers for the selected orders
@@ -401,22 +442,22 @@ function removeSelectedOrders() {
         
         // Update modal title and message based on selection count
         if (orderIds.length === 1) {
-            // Single order deletion
-            $("#removeModalTitle").html('<i class="ti ti-trash me-2"></i>Delete Order');
-            $("#removeModalMessage").html(`Are you sure you want to delete order <strong>${orderNumbers[0]}</strong>?`);
+            // Single order archiving
+            $("#archiveModalTitle").html('<i class="ti ti-archive me-2"></i>Archive Order');
+            $("#archiveModalMessage").html(`Are you sure you want to archive order <strong>${orderNumbers[0]}</strong>?`);
         } else {
-            // Multiple order deletion
-            $("#removeModalTitle").html('<i class="ti ti-trash me-2"></i>Delete Multiple Orders');
-            $("#removeModalMessage").html(`Are you sure you want to delete <strong>${orderIds.length}</strong> selected orders?`);
+            // Multiple order archiving
+            $("#archiveModalTitle").html('<i class="ti ti-archive me-2"></i>Archive Multiple Orders');
+            $("#archiveModalMessage").html(`Are you sure you want to archive <strong>${orderIds.length}</strong> selected orders?`);
         }
         
-        // Set the order IDs to delete
-        $("#removeOrderIds").val(JSON.stringify(orderIds));
+        // Set the order IDs to archive
+        $("#archiveOrderIds").val(JSON.stringify(orderIds));
         
         // Show the modal
-        $("#removeModal").modal("show");
+        $("#archiveModal").modal("show");
     } else {
-        alert('Please select at least one order to delete');
+        alert('Please select at least one order to archive');
     }
 }
 
@@ -446,8 +487,8 @@ function loadOrderTable(page = 1, search = '') {
                         <td>${order.user_name ? order.user_name : 'N/A'}</td>
                         <td>
                             ${order.paid_status == 1 ? 
-                                '<span class="badge badge-outline-success">Paid</span>' : 
-                                '<span class="badge badge-outline-danger">Unpaid</span>'
+                                '<span class="badge badge-outline-success">Completed</span>' : 
+                                '<span class="badge badge-outline-warning">Pending</span>'
                             }
                         </td>
                     </tr>`;
@@ -605,6 +646,108 @@ $("#editOrderForm").submit(function(e) {
                     <div class="lh-1">Error updating order. Please try again.</div>
                 </div>
             `);
+            autoDismissMessages();
+        }
+    });
+});
+
+// Add archive form submit handler
+$('#archiveForm').on('submit', function(e) {
+    e.preventDefault();
+    var orderIds = JSON.parse($('#archiveOrderIds').val());
+    
+    $.ajax({
+        url: base_url + "orders/archive",
+        type: 'POST',
+        data: { order_id: orderIds },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                $('#archiveModal').modal('hide');
+                
+                // Create success message based on response data
+                let successMessage = '';
+                if (response.order_no) {
+                    // Single order archiving
+                    successMessage = `Order <strong>${response.order_no}</strong> was successfully archived`;
+                } else if (response.order_count) {
+                    // Multiple order archiving
+                    successMessage = `<strong>${response.order_count}</strong> orders were successfully archived`;
+                } else {
+                    // Fallback if response format changes
+                    successMessage = response.messages;
+                }
+                
+                $('#messages').html(`
+                    <div class="alert alert-success text-bg-success alert-dismissible d-flex align-items-center" role="alert">
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+                        <iconify-icon icon="solar:check-read-line-duotone" class="fs-20 me-1"></iconify-icon>
+                        <div class="lh-1">${successMessage}</div>
+                    </div>
+                `);
+                autoDismissMessages();
+                
+                // Refresh the table to show updated data
+                loadOrderTable();
+            } else {
+                // Check if the message indicates missing columns
+                if (response.messages && response.messages.includes('not available')) {
+                    $('#archiveModal').modal('hide');
+                    $('#messages').html(`
+                        <div class="alert alert-warning text-bg-warning alert-dismissible d-flex align-items-center mb-3" role="alert">
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+                            <iconify-icon icon="solar:danger-triangle-bold-duotone" class="fs-20 me-1"></iconify-icon>
+                            <div class="lh-1">${response.messages}</div>
+                        </div>
+                        <div class="alert alert-info text-bg-info d-flex align-items-center" role="alert">
+                            <iconify-icon icon="solar:info-circle-bold-duotone" class="fs-20 me-1"></iconify-icon>
+                            <div class="flex-grow-1">Run the database migration to enable archiving.</div>
+                            <a href="${base_url}migration/add_archive_columns" target="_blank" class="btn btn-sm btn-light ms-3">
+                                <i class="ti ti-database me-1"></i> Run Migration
+                            </a>
+                        </div>
+                    `);
+                } else {
+                    $('#messages').html(`
+                        <div class="alert alert-danger text-bg-danger alert-dismissible d-flex align-items-center" role="alert">
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+                            <iconify-icon icon="solar:danger-triangle-bold-duotone" class="fs-20 me-1"></iconify-icon>
+                            <div class="lh-1">${response.messages}</div>
+                        </div>
+                    `);
+                }
+                autoDismissMessages();
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('Archive AJAX Error:', status, error);
+            console.log('Response Text:', xhr.responseText);
+            
+            try {
+                // Try to parse response as JSON
+                var errorResponse = JSON.parse(xhr.responseText);
+                var errorMessage = errorResponse.messages || 'Error archiving order(s). Please try again.';
+                
+                $('#messages').html(`
+                    <div class="alert alert-danger text-bg-danger alert-dismissible d-flex align-items-center" role="alert">
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+                        <iconify-icon icon="solar:danger-triangle-bold-duotone" class="fs-20 me-1"></iconify-icon>
+                        <div class="lh-1">${errorMessage}</div>
+                    </div>
+                `);
+            } catch (e) {
+                // If not valid JSON, use the default error message
+                $('#messages').html(`
+                    <div class="alert alert-danger text-bg-danger alert-dismissible d-flex align-items-center" role="alert">
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+                        <iconify-icon icon="solar:danger-triangle-bold-duotone" class="fs-20 me-1"></iconify-icon>
+                        <div class="lh-1">Error archiving order(s). Please try again.</div>
+                    </div>
+                `);
+            }
+            
+            // Close the modal even on error
+            $('#archiveModal').modal('hide');
             autoDismissMessages();
         }
     });
