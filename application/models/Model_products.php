@@ -16,13 +16,30 @@ class Model_products extends CI_Model
                     LEFT JOIN brands b ON p.brand_id = b.id 
                     WHERE p.id = ?";
             $query = $this->db->query($sql, array($id));
+            
+            // Check if product exists
+            if ($query->num_rows() == 0) {
+                return null;
+            }
+            
             $product = $query->row_array();
 
-            $category_ids = $product['category_id'];
-            $brand_ids = $product['brand_id'];
+            // Access array keys safely
+            $category_ids = isset($product['category_id']) ? $product['category_id'] : null;
+            $brand_ids = isset($product['brand_id']) ? $product['brand_id'] : null;
 
-            $product['category_name'] = $this->getCategoryNames($category_ids);
-            $product['brand'] = $this->getBrandName($brand_ids);
+            // Only attempt to get names if IDs exist
+            if ($category_ids) {
+                $product['category_name'] = $this->getCategoryNames($category_ids);
+            } else {
+                $product['category_name'] = 'N/A';
+            }
+            
+            if ($brand_ids) {
+                $product['brand'] = $this->getBrandName($brand_ids);
+            } else {
+                $product['brand'] = 'N/A';
+            }
 
             return $product;
         }

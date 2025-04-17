@@ -284,6 +284,122 @@ class Orders extends Admin_Controller
 	}
 
 	/*
+	* It gets the order data by order ID and returns it in JSON format
+	* This function is used in the order edit modal
+	*/
+	public function get_order_data()
+	{
+		$order_id = $this->input->post('order_id');
+		
+		if(!$order_id) {
+			echo json_encode(['success' => false, 'message' => 'Invalid order ID']);
+			return;
+		}
+		
+		// Get the order data
+		$orders_data = $this->model_orders->getOrdersData($order_id);
+		
+		if(!$orders_data) {
+			echo json_encode(['success' => false, 'message' => 'Order not found']);
+			return;
+		}
+		
+		// Get the order items
+		$orders_item = $this->model_orders->getOrdersItemData($orders_data['id']);
+		
+		$result = array(
+			'success' => true,
+			'order' => $orders_data,
+			'order_item' => $orders_item
+		);
+		
+		echo json_encode($result);
+	}
+
+	/*
+	* Fetch all order IDs that match the search criteria
+	* This is used for the "select all" functionality across pages
+	*/
+	public function get_all_order_ids()
+	{
+		$search = $this->input->get('search');
+		
+		// Fetch all order IDs based on search criteria
+		$this->db->select('id');
+		$this->db->from('orders');
+		
+		// Check if is_archived column exists before using it
+		$this->db->query("SHOW COLUMNS FROM orders LIKE 'is_archived'");
+		$is_archived_exists = $this->db->affected_rows() > 0;
+		
+		// Only filter by is_archived if the column exists
+		if ($is_archived_exists) {
+			$this->db->where('is_archived', 0);
+		}
+		
+		// Apply search filter
+		if(!empty($search)) {
+			$this->db->join('users', 'users.id = orders.user_id', 'left');
+			$this->db->group_start();
+			$this->db->like('orders.order_no', $search);
+			$this->db->or_like('users.firstname', $search);
+			$this->db->or_like('users.lastname', $search);
+			$this->db->or_like('orders.payment_method', $search);
+			$this->db->group_end();
+		}
+		
+		$query = $this->db->get();
+		$results = $query->result_array();
+		
+		// Extract just the IDs
+		$order_ids = array_column($results, 'id');
+		
+		echo json_encode(['order_ids' => $order_ids]);
+	}
+
+	/*
+	* Fetch all archived order IDs that match the search criteria
+	* This is used for the "select all" functionality across pages in the archive view
+	*/
+	public function get_all_archived_order_ids()
+	{
+		$search = $this->input->get('search');
+		
+		// Check if is_archived column exists
+		$this->db->query("SHOW COLUMNS FROM orders LIKE 'is_archived'");
+		$is_archived_exists = $this->db->affected_rows() > 0;
+		
+		if (!$is_archived_exists) {
+			echo json_encode(['order_ids' => []]);
+			return;
+		}
+		
+		// Fetch all archived order IDs based on search criteria
+		$this->db->select('id');
+		$this->db->from('orders');
+		$this->db->where('is_archived', 1);
+		
+		// Apply search filter
+		if(!empty($search)) {
+			$this->db->join('users', 'users.id = orders.user_id', 'left');
+			$this->db->group_start();
+			$this->db->like('orders.order_no', $search);
+			$this->db->or_like('users.firstname', $search);
+			$this->db->or_like('users.lastname', $search);
+			$this->db->or_like('orders.payment_method', $search);
+			$this->db->group_end();
+		}
+		
+		$query = $this->db->get();
+		$results = $query->result_array();
+		
+		// Extract just the IDs
+		$order_ids = array_column($results, 'id');
+		
+		echo json_encode(['order_ids' => $order_ids]);
+	}
+
+	/*
 	* If the validation is not valid, then it redirects to the edit orders page 
 	* If the validation is successfully then it updates the data into the database 
 	* and it stores the operation message into the session flashdata and display on the manage group page
@@ -645,8 +761,11 @@ class Orders extends Admin_Controller
 						foreach ($orders_items as $k => $v) {
 							$product_data = $this->model_products->getProductData($v['product_id']); 
 							
+							// Handle case where product data is null (product might have been deleted)
+							$product_name = isset($product_data['name']) ? $product_data['name'] : 'Product #' . $v['product_id'] . ' (deleted)';
+							
 							$html .= '<tr>
-								<td>'.$product_data['name'].'</td>
+								<td>'.$product_name.'</td>
 								<td style="text-align: center;">'.$v['qty'].'</td>
 								<td style="text-align: right;">₱'.number_format(floatval($v['rate']), 2).'</td>
 								<td style="text-align: right;">₱'.number_format(floatval($v['amount']), 2).'</td>

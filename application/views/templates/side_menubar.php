@@ -210,13 +210,13 @@
                     
                     <li class="side-nav-title mt-2">System</li>
                     <li class="side-nav-item">
-                        <a href="<?php echo base_url('manage/logs') ?>" class="side-nav-link">
+                        <a href="<?php echo base_url('logs') ?>" class="side-nav-link">
                             <span class="menu-icon"><i class="ti ti-logs"></i></span>
                             <span class="menu-text"> Activity Logs </span>
                         </a>
                     </li>
                     <li class="side-nav-item">
-                        <a href="<?php echo base_url('manage/settings') ?>" class="side-nav-link">
+                        <a href="<?php echo base_url('settings') ?>" class="side-nav-link">
                             <span class="menu-icon"><i class="ti ti-adjustments-alt"></i></span>
                             <span class="menu-text"> System Settings </span>
                         </a>

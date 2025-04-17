@@ -320,7 +320,7 @@
     // Start observing the target node for configured mutations
     productTableObserver.observe(document.querySelector('#product_info_table tbody'), {
       childList: true, // observe direct children
-      subtree: false   // don't observe deeper descendants
+      subtree: false   // don't observe descendants
     });
     
     // Fix Select2 in Bootstrap modal issues
@@ -566,21 +566,27 @@
       }
     });
     
-    // Calculate change on cash input
+    // Real-time change calculation
     $('#cash_given').on('input', function() {
       calculateChange();
     });
-
-    // Handle Enter key on cash input
+    
+    // Handle Enter key on cash_given input
     $('#cash_given').on('keydown', function(e) {
-      if (e.key === 'Enter' || e.keyCode === 13) {
+      if(e.key === 'Enter' || e.keyCode === 13) {
         e.preventDefault();
-        if (!$('#confirm_cash_payment').prop('disabled')) {
+        if(!$('#confirm_cash_payment').prop('disabled')) {
           $('#confirm_cash_payment').click();
         }
       }
     });
-
+    
+    // When cash payment modal is shown, focus on cash_given input
+    $('#cashPaymentModal').on('shown.bs.modal', function() {
+      $('#cash_given').focus();
+      calculateChange(); // Initialize calculation
+    });
+    
     // Confirm cash payment
     $('#confirm_cash_payment').on('click', function() {
       if (!$(this).prop('disabled')) {

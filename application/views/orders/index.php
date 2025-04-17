@@ -46,7 +46,7 @@
                                 <?php if(in_array('viewArchivedOrder', $user_permission)): ?>
                                     <a href="<?php echo base_url('orders/archive') ?>" class="btn btn-soft-warning"><i class="ti ti-archive me-1"></i> View Archives</a>
                                 <?php endif; ?>
-                                <div class="dropdown order-actions" style="display: none !important;">
+                                <div class="dropdown order-actions" style="display: none;">
                                     <button type="button" class="btn btn-danger dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
                                         <i class="ti ti-settings me-1"></i> Actions
                                     </button>
@@ -272,6 +272,49 @@ function autoDismissMessages() {
     }, 5000); // 5 seconds
 }
 
+// Function to get all order IDs
+function getAllOrderIds(search = '') {
+    return new Promise((resolve, reject) => {
+        $.ajax({
+            url: base_url + "orders/get_all_order_ids",
+            type: "GET",
+            data: {
+                search: search
+            },
+            dataType: "json",
+            success: function(response) {
+                resolve(response.order_ids);
+            },
+            error: function() {
+                reject("Failed to get order IDs");
+            }
+        });
+    });
+}
+
+// Track order selection across pages
+let selectedOrderIds = [];
+let allOrderIds = [];
+let selectAllChecked = false;
+
+// Initialize the page with all order IDs
+function initializeAllOrderIds() {
+    const search = $("#searchBox").val();
+    getAllOrderIds(search).then(ids => {
+        allOrderIds = ids;
+        // Check if we have previously set selectAllChecked to true
+        if (selectAllChecked) {
+            selectedOrderIds = [...allOrderIds]; // Reset the selected IDs to all available IDs
+            // Update checkboxes on the current page
+            $('.order-check').prop('checked', true);
+        }
+        // Update the toggle actions
+        toggleOrderActions();
+    }).catch(error => {
+        console.error(error);
+    });
+}
+
 $(document).ready(function() {
     $("#mainOrdersNav").addClass('active');
     $("#manageOrdersNav").addClass('active');
@@ -289,6 +332,7 @@ $(document).ready(function() {
     // Show orders button click handler
     $("#showOrdersBtn").click(function() {
         loadOrderTable();
+        initializeAllOrderIds();
         $(this).hide();
     });
 
@@ -296,30 +340,78 @@ $(document).ready(function() {
     $('#searchBox').on('keyup', function() {
         var searchText = $(this).val();
         loadOrderTable(1, searchText);
+        
+        // Reset selections on search change
+        selectedOrderIds = [];
+        selectAllChecked = false;
+        $("#checkAll").prop("checked", false);
+        
+        // Update all order IDs for the new search
+        initializeAllOrderIds();
     });
 
     // Check all functionality
     $("#checkAll").click(function() {
-        $('input[type="checkbox"]').prop('checked', $(this).prop('checked'));
+        selectAllChecked = $(this).prop("checked");
+        
+        if (selectAllChecked) {
+            selectedOrderIds = [...allOrderIds]; // Select all orders across pages
+            
+            // Check all checkboxes on current page
+            $('.order-check').prop('checked', true);
+        } else {
+            selectedOrderIds = []; // Deselect all orders
+            
+            // Uncheck all checkboxes on current page
+            $('.order-check').prop('checked', false);
+        }
+        
         toggleOrderActions();
     });
 
     // Individual checkbox change
     $(document).on('change', '.order-check', function() {
-        if ($('.order-check:checked').length === $('.order-check').length) {
+        const orderId = $(this).val();
+        const isChecked = $(this).prop('checked');
+        
+        if (isChecked && !selectedOrderIds.includes(orderId)) {
+            selectedOrderIds.push(orderId);
+        } else if (!isChecked && selectedOrderIds.includes(orderId)) {
+            selectedOrderIds = selectedOrderIds.filter(id => id !== orderId);
+        }
+        
+        // Update the select all checkbox
+        if (selectedOrderIds.length === allOrderIds.length && allOrderIds.length > 0) {
             $('#checkAll').prop('checked', true);
+            selectAllChecked = true;
         } else {
             $('#checkAll').prop('checked', false);
+            selectAllChecked = false;
         }
+        
         toggleOrderActions();
     });
     
-    // Handle pagination clicks
-    $(document).on('click', '.pagination .page-link', function(e) {
+    // When switching pages, update the checkboxes based on selectedOrderIds
+    $(document).on("click", ".pagination .page-link", function(e) {
         e.preventDefault();
         var page = $(this).data('page');
         if (page) {
             loadOrderTable(page, $('#searchBox').val());
+            
+            // After page content loads, update checkboxes
+            setTimeout(function() {
+                // Check/uncheck boxes on the new page based on selectedOrderIds
+                $(".order-check").each(function() {
+                    const orderId = $(this).val();
+                    $(this).prop("checked", selectedOrderIds.includes(orderId));
+                });
+                
+                // Update select all checkbox state
+                $("#checkAll").prop("checked", selectAllChecked);
+                
+                toggleOrderActions();
+            }, 500); // Wait for page content to load
         }
     });
 
@@ -335,13 +427,28 @@ $(document).ready(function() {
             if(selectedOrder) {
                 // Fetch order details
                 $.ajax({
-                    url: base_url + "orders/get_order",
+                    url: base_url + "orders/get_order_data",
                     type: 'POST',
                     data: { order_id: selectedOrder },
                     dataType: 'json',
                     success: function(response) {
                         if(response.success) {
-                            let order = response.data;
+                            let order = response.order;
+                            
+                            // Check if order is completed (paid_status = 1)
+                            if(order.paid_status == 1) {
+                                // Show message that completed orders can't be edited
+                                $('#messages').html(`
+                                    <div class="alert alert-warning text-bg-warning alert-dismissible d-flex align-items-center" role="alert">
+                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+                                        <iconify-icon icon="solar:danger-triangle-bold-duotone" class="fs-20 me-1"></iconify-icon>
+                                        <div class="lh-1">Completed orders cannot be edited.</div>
+                                    </div>
+                                `);
+                                autoDismissMessages();
+                                return;
+                            }
+                            
                             // Populate the edit form with order data
                             $('#edit_order_id').val(order.id);
                             
@@ -388,15 +495,37 @@ $(document).ready(function() {
 
 // Function to toggle order actions visibility
 function toggleOrderActions() {
-    var checkedCount = $('.order-check:checked').length;
+    // Count selected orders
+    var checkedCount = selectedOrderIds.length;
+    
     if (checkedCount > 0) {
         $('.order-actions').show();
         
         // Hide or show Print Receipt and Edit based on selection count
         if (checkedCount === 1) {
-            // Show Print Receipt and Edit options when exactly one order is selected
-            $('.dropdown-menu a:contains("Print Receipt")').parent().show();
-            $('.dropdown-menu a:contains("Edit")').parent().show();
+            // For a single selection, we need to find if the order is paid
+            // Find the checkbox on the current page if possible
+            var checkedBox = $('.order-check:checked');
+            
+            if (checkedBox.length === 1) {
+                // We have the order on the current page
+                var selectedRow = checkedBox.closest('tr');
+                var isPaid = selectedRow.find('td:eq(7) .badge').hasClass('badge-outline-success');
+                
+                // Show Print Receipt for all orders
+                $('.dropdown-menu a:contains("Print Receipt")').parent().show();
+                
+                // Only show Edit option if the order is not completed (not paid)
+                if (isPaid) {
+                    $('.dropdown-menu a:contains("Edit")').parent().hide();
+                } else {
+                    $('.dropdown-menu a:contains("Edit")').parent().show();
+                }
+            } else {
+                // The selected order is not on the current page, so just show Print Receipt
+                $('.dropdown-menu a:contains("Print Receipt")').parent().show();
+                $('.dropdown-menu a:contains("Edit")').parent().hide();
+            }
         } else {
             // Hide Print Receipt and Edit options when multiple orders are selected
             $('.dropdown-menu a:contains("Print Receipt")').parent().hide();
@@ -409,21 +538,39 @@ function toggleOrderActions() {
 
 // Function to get selected order IDs
 function getSelectedOrderIds() {
-    var orderIds = [];
-    $('.order-check:checked').each(function() {
-        orderIds.push($(this).val());
-    });
-    return orderIds;
+    return selectedOrderIds;
 }
 
 // Function to view selected orders
 function viewReceipt() {
     var orderIds = getSelectedOrderIds();
     if (orderIds.length === 1) {
-        // Get the order number for the selected order
-        var selectedRow = $('.order-check:checked').closest('tr');
-        var orderNo = selectedRow.find('td:eq(1)').text(); // Get the order number from the second column
-        window.location.href = base_url + 'orders/receipt/' + orderNo;
+        // Find the selected checkbox on the current page
+        var selectedCheckbox = $(`.order-check[value="${orderIds[0]}"]`);
+        
+        if (selectedCheckbox.length > 0) {
+            // The order is on the current page, get its order number
+            var orderNo = selectedCheckbox.closest('tr').find('td:eq(1)').text().trim();
+            window.location.href = base_url + 'orders/receipt/' + orderNo;
+        } else {
+            // The order is not on the current page, we need to fetch its details from the server
+            $.ajax({
+                url: base_url + "orders/get_order_data",
+                type: 'POST',
+                data: { order_id: orderIds[0] },
+                dataType: 'json',
+                success: function(response) {
+                    if (response.success) {
+                        window.location.href = base_url + 'orders/receipt/' + response.order.order_no;
+                    } else {
+                        alert('Could not retrieve order details');
+                    }
+                },
+                error: function() {
+                    alert('Error retrieving order details');
+                }
+            });
+        }
     } else {
         alert('Please select only one order to view');
     }
@@ -475,8 +622,11 @@ function loadOrderTable(page = 1, search = '') {
             let html = '';
             if (response && response.data && response.data.length > 0) {
                 response.data.forEach(function(order) {
+                    // Check if the order ID is in the selectedOrderIds array
+                    const isChecked = selectedOrderIds.includes(order.id) ? 'checked' : '';
+                    
                     html += `<tr>
-                        <td class="ps-3"><input type="checkbox" class="form-check-input order-check" value="${order.id}"></td>
+                        <td class="ps-3"><input type="checkbox" class="form-check-input order-check" value="${order.id}" ${isChecked}></td>
                         <td>${order.order_no}</td>
                         <td>${order.date_time}</td>
                         <td>${order.total_products}</td>
@@ -524,9 +674,22 @@ function loadOrderTable(page = 1, search = '') {
                 $("#productFooter").show();
             }
             
-            // Reset checkboxes and actions
-            $('#checkAll').prop('checked', false);
-            $('.order-actions').hide();
+            // Update the select all checkbox based on the current selection state
+            $("#checkAll").prop("checked", selectAllChecked);
+            
+            // Apply selection states to checkboxes after loading
+            setTimeout(function() {
+                $(".order-check").each(function() {
+                    const orderId = $(this).val();
+                    $(this).prop("checked", selectedOrderIds.includes(orderId));
+                });
+                
+                // Update visibility of action buttons
+                toggleOrderActions();
+            }, 100);
+            
+            // Initialize all order IDs to ensure we have the complete list
+            initializeAllOrderIds();
         },
         error: function (xhr, status, error) {
             $("#manageTable tbody").html(`
