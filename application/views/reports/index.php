@@ -74,7 +74,7 @@
               <table class="table table-hover text-nowrap mb-0">
                 <thead class="bg-dark-subtle">
                   <tr>
-                    <th>Month - Year</th>
+                    <th>Year - Month</th>
                     <th>Amount</th>
                   </tr>
                 </thead>
@@ -82,14 +82,14 @@
                   <?php foreach ($results as $k => $v): ?>
                     <tr>
                       <td><?php echo $k; ?></td>
-                      <td><?php echo $company_currency . ' ' . number_format($v, 2); ?></td>
+                      <td><?php echo $company_currency . '' . number_format($v, 2); ?></td>
                     </tr>
                   <?php endforeach ?>
                 </tbody>
                 <tfoot class="bg-dark-subtle">
                   <tr>
                     <th>Total Amount</th>
-                    <th><?php echo $company_currency . ' ' . number_format(array_sum($results), 2); ?></th>
+                    <th><?php echo $company_currency . '' .number_format(array_sum($results), 2); ?></th>
                   </tr>
                 </tfoot>
               </table>
