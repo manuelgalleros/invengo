@@ -209,12 +209,14 @@
                     <?php endif; ?>
                     
                     <li class="side-nav-title mt-2">System</li>
+                    <?php if(in_array('viewLog', $user_permission)): ?>
                     <li class="side-nav-item">
                         <a href="<?php echo base_url('logs') ?>" class="side-nav-link">
                             <span class="menu-icon"><i class="ti ti-logs"></i></span>
                             <span class="menu-text"> Activity Logs </span>
                         </a>
                     </li>
+                    <?php endif; ?>
                     <li class="side-nav-item">
                         <a href="<?php echo base_url('settings') ?>" class="side-nav-link">
                             <span class="menu-icon"><i class="ti ti-adjustments-alt"></i></span>

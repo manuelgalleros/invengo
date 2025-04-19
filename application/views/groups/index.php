@@ -357,6 +357,24 @@
                     </td>
                   </tr>
                   <tr>
+                    <td>Logs</td>
+                    <td class="text-center">
+                      <div>-</div>
+                    </td>
+                    <td class="text-center">
+                      <div>-</div>
+                    </td>
+                    <td class="text-center">
+                      <div>
+                        <input type="checkbox" id="viewLog" name="permission[]" value="viewLog" data-switch="success">
+                        <label for="viewLog" data-on-label="Yes" data-off-label="No" class="mb-0 d-block"></label>
+                      </div>
+                    </td>
+                    <td class="text-center">
+                      <div>-</div>
+                    </td>
+                  </tr>
+                  <tr>
                     <td>Setting</td>
                     <td class="text-center">
                       <div>-</div>
@@ -982,6 +1000,24 @@
                       </td>
                     </tr>
                     <tr>
+                      <td>Logs</td>
+                      <td class="text-center">
+                        <div>-</div>
+                      </td>
+                      <td class="text-center">
+                        <div>-</div>
+                      </td>
+                      <td class="text-center">
+                        <div>
+                          <input type="checkbox" id="edit_viewLog" name="permission[]" value="viewLog" data-switch="success" ${permissions.includes('viewLog') ? 'checked' : ''}>
+                          <label for="edit_viewLog" data-on-label="Yes" data-off-label="No" class="mb-0 d-block"></label>
+                        </div>
+                      </td>
+                      <td class="text-center">
+                        <div>-</div>
+                      </td>
+                    </tr>
+                    <tr>
                       <td>Setting</td>
                       <td class="text-center">
                         <div>-</div>
@@ -1196,6 +1232,7 @@
               'Order': { create: false, update: false, view: false, delete: false },
               'Report': { create: false, update: false, view: false, delete: false },
               'Profile': { create: false, update: false, view: false, delete: false },
+              'Log': { create: false, update: false, view: false, delete: false },
               'Setting': { create: false, update: false, view: false, delete: false }
             };
             
@@ -1243,6 +1280,9 @@
               else if(perm.includes('Profile')) {
                 if(perm === 'viewProfile') modules.Profile.view = true;
               }
+              else if(perm.includes('Log')) {
+                if(perm === 'viewLog') modules.Log.view = true;
+              }
               else if(perm.includes('Setting')) {
                 if(perm === 'updateSetting') modules.Setting.update = true;
               }
@@ -1253,10 +1293,10 @@
               html += `
                 <tr>
                   <td>${module === 'Category' ? 'Categories' : module + 's'}</td>
-                  <td class="text-center">${module === 'Report' || module === 'Profile' || module === 'Setting' ? '-' : renderPermissionIcon(modules[module].create)}</td>
-                  <td class="text-center">${module === 'Report' || module === 'Profile' ? '-' : (module === 'Setting' ? renderPermissionIcon(modules[module].update) : renderPermissionIcon(modules[module].update))}</td>
+                  <td class="text-center">${module === 'Report' || module === 'Profile' || module === 'Log'|| module === 'Setting' ? '-' : renderPermissionIcon(modules[module].create)}</td>
+                  <td class="text-center">${module === 'Report' || module === 'Profile' || module === 'Log' ? '-' : (module === 'Setting' ? renderPermissionIcon(modules[module].update) : renderPermissionIcon(modules[module].update))}</td>
                   <td class="text-center">${module === 'Setting' ? '-' : renderPermissionIcon(modules[module].view)}</td>
-                  <td class="text-center">${module === 'Report' || module === 'Profile' || module === 'Setting' ? '-' : renderPermissionIcon(modules[module].delete)}</td>
+                  <td class="text-center">${module === 'Report' || module === 'Profile' || module === 'Log' || module === 'Setting' ? '-' : renderPermissionIcon(modules[module].delete)}</td>
                 </tr>
               `;
             }

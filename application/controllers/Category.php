@@ -14,6 +14,7 @@ class Category extends Admin_Controller
 
 		$this->load->model('model_category');
 		$this->load->model('model_users');
+		$this->load->library('logs');
 	}
 
 	/* 
@@ -122,10 +123,29 @@ class Category extends Admin_Controller
 
         	$create = $this->model_category->create($data);
         	if($create == true) {
+                // Get the newly inserted category ID
+                $category_id = $this->db->insert_id();
+                
+                // Log successful category creation with category ID
+                $this->logs->logActivity(
+                    'create',
+                    'Categories',
+                    'Created new category: ' . $category_name . ' (ID: ' . $category_id . ')',
+                    true
+                );
+                
         		$response['success'] = true;
         		$response['messages'] = "Category '" . $category_name . "' successfully created.";
         	}
         	else {
+                // Log failed category creation
+                $this->logs->logActivity(
+                    'create',
+                    'Categories',
+                    'Failed to create category: ' . $category_name,
+                    false
+                );
+                
         		$response['success'] = false;
         		$response['messages'] = 'Error in the database while creating the category information.';			
         	}
@@ -171,10 +191,26 @@ class Category extends Admin_Controller
 
 	        	$update = $this->model_category->update($data, $category_id);
 	        	if($update == true) {
+                    // Log successful category update with category ID
+                    $this->logs->logActivity(
+                        'update',
+                        'Categories',
+                        'Updated category: ' . $category_name . ' (ID: ' . $category_id . ')',
+                        true
+                    );
+                    
 	        		$response['success'] = true;
 	        		$response['messages'] = "Category '" . $category_name . "' successfully updated.";
 	        	}
 	        	else {
+                    // Log failed category update
+                    $this->logs->logActivity(
+                        'update',
+                        'Categories',
+                        'Failed to update category: ' . $category_name,
+                        false
+                    );
+                    
 	        		$response['success'] = false;
 	        		$response['messages'] = 'Error in the database while updating the category information';			
 	        	}
@@ -206,43 +242,60 @@ class Category extends Admin_Controller
 		
 		$category_id = $this->input->post('category_id');
 
+		// Debug the input value
+		log_message('debug', 'Category remove - category_id: ' . (is_array($category_id) ? json_encode($category_id) : $category_id));
+        
+        // Handle if category_id is an array
+        if (is_array($category_id)) {
+            $category_id = isset($category_id[0]) ? $category_id[0] : null;
+            log_message('debug', 'Category remove - converted category_id to: ' . $category_id);
+        }
+
+		// Get category data before deletion for logging
+        $category_data = $this->model_category->getCategoryData($category_id);
+        
+        // Check if category data exists and properly extract the name
+        $category_name = 'Unknown';
+        if ($category_data) {
+            if (is_array($category_data) && isset($category_data['name'])) {
+                $category_name = $category_data['name'];
+            } elseif (is_array($category_data) && isset($category_data[0]['name'])) {
+                // If we got back an array of categories, use the first one
+                $category_name = $category_data[0]['name'];
+            }
+        }
+
 		$response = array();
 		if($category_id) {
-			// Get category name(s) before deletion
-			$category_names = [];
-			if(is_array($category_id)) {
-				foreach($category_id as $id) {
-					$category_data = $this->model_category->getCategoryData($id);
-					if($category_data) {
-						$category_names[] = $category_data['name'];
-					}
-				}
-			} else {
-				$category_data = $this->model_category->getCategoryData($category_id);
-				if($category_data) {
-					$category_names[] = $category_data['name'];
-				}
-			}
-			
-			// Delete the category(s)
 			$delete = $this->model_category->remove($category_id);
-			
 			if($delete == true) {
+				// Log successful category deletion with category ID and name
+				$this->logs->logActivity(
+					'delete',
+					'Categories',
+					'Deleted category: ' . $category_name . ' (ID: ' . (is_array($category_id) ? json_encode($category_id) : $category_id) . ')',
+					true
+				);
+				
 				$response['success'] = true;
-				if(count($category_names) == 1) {
-					$response['messages'] = "Category '" . $category_names[0] . "' successfully removed.";
-				} else {
-					$response['messages'] = count($category_names) . " categories successfully removed: " . implode(", ", $category_names);
-				}
+				$response['messages'] = "Successfully removed";	
 			}
 			else {
+				// Log failed category deletion
+				$this->logs->logActivity(
+					'delete',
+					'Categories',
+					'Failed to delete category: ' . $category_name . ' (ID: ' . (is_array($category_id) ? json_encode($category_id) : $category_id) . ')',
+					false
+				);
+				
 				$response['success'] = false;
 				$response['messages'] = "Error in the database while removing the category information";
 			}
 		}
 		else {
 			$response['success'] = false;
-			$response['messages'] = "Refresh the page again!!";
+			$response['messages'] = "Refersh the page again!!";
 		}
 
 		echo json_encode($response);

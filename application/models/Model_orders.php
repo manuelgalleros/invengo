@@ -11,9 +11,19 @@ class Model_orders extends CI_Model
 	public function getOrdersData($id = null)
 	{
 		if($id) {
-			$sql = "SELECT * FROM orders WHERE id = ?";
-			$query = $this->db->query($sql, array($id));
-			return $query->row_array();
+			// Handle both single ID and array of IDs
+			if(is_array($id)) {
+				// If it's an array and we need the first item only
+				$first_id = reset($id);
+				$sql = "SELECT * FROM orders WHERE id = ?";
+				$query = $this->db->query($sql, array($first_id));
+				return $query->row_array();
+			} else {
+				// Single ID case
+				$sql = "SELECT * FROM orders WHERE id = ?";
+				$query = $this->db->query($sql, array($id));
+				return $query->row_array();
+			}
 		}
 
 		// Check if is_archived column exists before using it

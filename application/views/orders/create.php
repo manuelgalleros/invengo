@@ -550,7 +550,11 @@
         $('#total_amount').val($('#net_amount').val());
         $('#cash_given').val('');
         $('#change_amount').val('0.00');
+        
+        // Always hide the error initially
         $('#cash-error').addClass('d-none');
+        
+        // Disable confirm button until sufficient cash is entered
         $('#confirm_cash_payment').prop('disabled', true);
         
         // Show the modal
@@ -584,7 +588,9 @@
     // When cash payment modal is shown, focus on cash_given input
     $('#cashPaymentModal').on('shown.bs.modal', function() {
       $('#cash_given').focus();
-      calculateChange(); // Initialize calculation
+      
+      // Don't call calculateChange() here - just set initial state
+      // The error should only appear after user interaction
     });
     
     // Confirm cash payment
@@ -638,12 +644,14 @@
       $('#change_amount').val(change > 0 ? change.toFixed(2) : '0.00');
       
       // Show/hide error message and manage confirm button state
-      if (cashGiven < totalAmount) {
+      if (cashGiven < totalAmount && $('#cash_given').val() !== '') {
+        // Only show error if cash_given has a value and is insufficient
         $('#cash-error').removeClass('d-none');
         $('#confirm_cash_payment').prop('disabled', true);
       } else {
         $('#cash-error').addClass('d-none');
-        $('#confirm_cash_payment').prop('disabled', false);
+        // Only enable confirm button if there's sufficient cash
+        $('#confirm_cash_payment').prop('disabled', cashGiven < totalAmount);
       }
     }
     

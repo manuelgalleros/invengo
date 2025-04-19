@@ -19,6 +19,7 @@ class Products extends Admin_Controller
         $this->load->model('model_users');
 		$this->load->model('model_attributes');
         $this->load->library('upload');
+        $this->load->library('logs');
 
         // Ensure upload directory exists and is writable
         $upload_path = FCPATH . 'assets/images/product_images/';
@@ -198,51 +199,187 @@ class Products extends Admin_Controller
     * If the validation for each input field is valid then it inserts the data into the database 
     * and it stores the operation message into the session flashdata and display on the manage product page
     */
-public function create()
-{
-    if (!in_array('createProduct', $this->permission)) {
-        redirect('dashboard', 'refresh');
+    public function create()
+    {
+        if (!in_array('createProduct', $this->permission)) {
+            redirect('dashboard', 'refresh');
+        }
+        
+        // For AJAX requests, check if this is an AJAX request
+        $is_ajax = $this->input->is_ajax_request();
+        
+        if ($is_ajax) {
+            // For AJAX requests, we'll return JSON responses
+            $this->form_validation->set_rules('product_name', 'Product name', 'trim|required');
+            $this->form_validation->set_rules('sku', 'SKU', 'trim|required');
+            $this->form_validation->set_rules('sku', 'SKU', 'callback_check_duplicate');
+            $this->form_validation->set_rules('price', 'Price', 'trim|required');
+            $this->form_validation->set_rules('description', 'Description', 'trim|required');
+            $this->form_validation->set_rules('category', 'Category', 'trim|required');
+            $this->form_validation->set_rules('brand', 'Brand', 'trim|required');
+            $this->form_validation->set_rules('quantity', 'Quantity', 'trim|required|numeric');
+            
+            if ($this->form_validation->run() === TRUE) {
+                // Process the upload
+                $upload_error = $this->handle_upload();
+                if($upload_error) {
+                    // Return upload error
+                    echo json_encode([
+                        'success' => false,
+                        'message' => $upload_error
+                    ]);
+                    return;
+                }
+                
+                $product_id = $this->model_products->create($this->upload_data);
+                
+                if($product_id) {
+                    // Get the product details for logging
+                    $product = $this->model_products->getProductData($product_id);
+                    
+                    // Log successful product creation with product SKU/ID
+                    $this->logs->logActivity(
+                        'create',
+                        'Products',
+                        'Created product: ' . $product['name'] . ' (SKU: ' . $product['sku'] . ', ID: ' . $product_id . ')',
+                        true
+                    );
+                    
+                    echo json_encode([
+                        'success' => true,
+                        'message' => 'Product created successfully',
+                        'product_id' => $product_id
+                    ]);
+                } else {
+                    echo json_encode([
+                        'success' => false,
+                        'message' => 'Error occurred while creating product in database'
+                    ]);
+                }
+            } else {
+                // Form validation failed
+                echo json_encode([
+                    'success' => false,
+                    'message' => strip_tags(validation_errors())
+                ]);
+            }
+            return;
+        }
+        
+        // For regular form submissions (non-AJAX)
+        $this->data['page_title'] = 'Add Products';
+        $this->data['brands'] = $this->model_brands->getActiveBrands();        	
+        $this->data['category'] = $this->model_category->getActiveCategroy();     
+        $user_id = $this->session->userdata('id');
+        $this->data['user_data'] = $this->model_users->getUserData($user_id);
+
+        $this->form_validation->set_rules('product_name', 'Product name', 'trim|required');
+        $this->form_validation->set_rules('sku', 'SKU', 'trim|required');
+        $this->form_validation->set_rules('sku', 'SKU', 'callback_check_duplicate');
+        $this->form_validation->set_rules('price', 'Price', 'trim|required');
+        $this->form_validation->set_rules('description', 'Description', 'trim|required');
+        $this->form_validation->set_rules('category', 'Category', 'trim|required');
+        $this->form_validation->set_rules('brand', 'Brand', 'trim|required');
+        $this->form_validation->set_rules('quantity', 'Quantity', 'trim|required|numeric');
+
+        if ($this->form_validation->run() === TRUE) {
+            // Process the upload
+            $upload_error = $this->handle_upload();
+            if($upload_error) {
+                // Handle upload error
+                $this->session->set_flashdata('error', $upload_error);
+                $this->render_template('products/create', $this->data);
+                return;
+            }
+            
+            $product_id = $this->model_products->create($this->upload_data);
+            
+            if($product_id) {
+                // Get the product details for logging
+                $product = $this->model_products->getProductData($product_id);
+                
+                // Log successful product creation with product SKU/ID
+                $this->logs->logActivity(
+                    'create',
+                    'Products',
+                    'Created product: ' . $product['name'] . ' (SKU: ' . $product['sku'] . ', ID: ' . $product_id . ')',
+                    true
+                );
+                
+                $this->session->set_flashdata('success', 'Successfully created');
+                redirect('products/', 'refresh');
+            }
+            else {
+                $this->session->set_flashdata('error', 'Error occurred!!');
+                $this->render_template('products/create', $this->data);
+            }
+        } else {
+            // false case
+            $this->render_template('products/create', $this->data);
+        }	
     }
-    $this->data['page_title'] = 'Add Products';
-    $this->data['brands'] = $this->model_brands->getActiveBrands();        	
-    $this->data['category'] = $this->model_category->getActiveCategroy();     
-    $user_id = $this->session->userdata('id');
-    $this->data['user_data'] = $this->model_users->getUserData($user_id);
 
-    if ($_SERVER['REQUEST_METHOD'] == 'GET') {
-        $this->render_template('products/create', $this->data);
-        return;
+    /**
+     * Handle file upload for product images
+     * This function is called from the create method to handle image uploads
+     * @return string|null Returns error message on failure, null on success
+     */
+    public function handle_upload()
+    {
+        log_message('debug', 'Starting handle_upload method');
+        
+        // Set up the upload configuration
+        $upload_path = 'assets/images/product_images/';
+        $config['upload_path'] = $upload_path;
+        $config['file_name'] = uniqid();
+        $config['allowed_types'] = 'gif|jpg|png|jpeg';
+        $config['max_size'] = '10000';
+        
+        // Initialize the upload library
+        $this->load->library('upload', $config);
+        $this->upload->initialize($config);
+        
+        // Log the POST data for debugging
+        log_message('debug', 'POST data: ' . json_encode($_POST));
+        
+        // Set default data
+        $this->upload_data = [
+            'name' => $this->input->post('product_name'),
+            'sku' => $this->input->post('sku'),
+            'price' => $this->input->post('price'),
+            'description' => $this->input->post('description'),
+            'category_id' => $this->input->post('category'),
+            'brand_id' => $this->input->post('brand'),
+            'qty' => $this->input->post('quantity'),
+            'barcode' => $this->input->post('barcode'),
+            'availability' => $this->input->post('availability') ? 1 : 0
+        ];
+        
+        log_message('debug', 'Product data: ' . json_encode($this->upload_data));
+        
+        // Check if a file was uploaded
+        if(!empty($_FILES['product_image']['name'])) {
+            log_message('debug', 'Attempting to upload file: ' . $_FILES['product_image']['name']);
+            
+            // Attempt to upload the file
+            if($this->upload->do_upload('product_image')) {
+                $upload_data = $this->upload->data();
+                $this->upload_data['image'] = $upload_path . $upload_data['file_name'];
+                log_message('debug', 'File upload successful: ' . $this->upload_data['image']);
+                return null; // No error
+            } else {
+                // Log and return upload error
+                $error = $this->upload->display_errors();
+                log_message('error', 'File upload failed: ' . $error);
+                return $error;
+            }
+        } else {
+            // No file uploaded, use default image
+            log_message('debug', 'No file uploaded, using default image');
+            $this->upload_data['image'] = 'assets/images/product_images/no-image.jpg';
+            return null; // No error
+        }
     }
-
-    // Skip server-side validation since we're using jQuery validation
-    // Upload Image or Assign Default
-    $upload_image = $this->upload_image();
-
-    // Prepare Data for Insertion
-    $data = array(
-        'name' => $this->input->post('product_name'),
-        'sku' => $this->input->post('sku'),
-        'price' => $this->input->post('price'),
-        'qty' => $this->input->post('quantity'),
-        'barcode' => $this->input->post('barcode'),
-        'image' => $upload_image,  
-        'description' => $this->input->post('description'),
-        'brand_id' => $this->input->post('brand'),
-        'category_id' => $this->input->post('category'),
-        'availability' => $this->input->post('availability'),
-    );
-
-    $create = $this->model_products->create($data);
-
-    header('Content-Type: application/json');
-
-    if ($create) {
-        echo json_encode(["success" => true, "message" => "Product added successfully."]);
-    } else {
-        echo json_encode(["success" => false, "message" => "An error occurred. Please try again."]);
-    }
-}
-
 
     /*
     * This function is invoked from another function to upload the image into the assets folder
@@ -280,127 +417,239 @@ public function create()
     * If the validation is successfully then it updates the data into the database 
     * and it stores the operation message into the session flashdata and display on the manage product page
     */
-	public function update()
-	{
-        if(!in_array('updateProduct', $this->permission)) {
-            $response['success'] = false;
-            $response['message'] = 'You do not have permission to update products';
-            echo json_encode($response);
+    public function update()
+    {
+        if (!in_array('updateProduct', $this->permission)) {
+            echo json_encode(["success" => false, "message" => "You don't have permission to update products"]);
             return;
         }
 
+        // Log the POST data for debugging
+        log_message('debug', 'Products update POST data: ' . json_encode($_POST));
+        
+        $product_id = $this->input->post('product_id');
+        
+        // Validate form data
         $this->form_validation->set_rules('product_name', 'Product name', 'trim|required');
         $this->form_validation->set_rules('sku', 'SKU', 'trim|required');
         $this->form_validation->set_rules('price', 'Price', 'trim|required|numeric');
         $this->form_validation->set_rules('quantity', 'Quantity', 'trim|required|numeric');
         $this->form_validation->set_rules('description', 'Description', 'trim|required');
-        $this->form_validation->set_rules('category', 'Category', 'trim|required');
-        $this->form_validation->set_rules('brand', 'Brand', 'trim|required');
-        $this->form_validation->set_rules('availability', 'Availability', 'trim|required');
-
-        if ($this->form_validation->run() == TRUE) {
-            $product_id = $this->input->post('product_id');
-            
-            // Prepare product data
-            $data = array(
-                'name' => $this->input->post('product_name'),
-                'sku' => $this->input->post('sku'),
-                'price' => $this->input->post('price'),
-                'qty' => $this->input->post('quantity'),
-                'description' => $this->input->post('description'),
-                'category_id' => $this->input->post('category'),
-                'brand_id' => $this->input->post('brand'),
-                'availability' => $this->input->post('availability'),
-                'barcode' => $this->input->post('barcode')
-            );
-
-            // Handle image upload if a new image is provided
-            if(!empty($_FILES['product_image']['name'])) {
-                $config['upload_path'] = 'assets/images/product_images/';
-                $config['allowed_types'] = 'gif|jpg|png|jpeg';
-                $config['max_size'] = '2048'; // 2MB max
-                $config['file_name'] = uniqid() . '_' . $_FILES['product_image']['name'];
-
-                // Make sure the upload directory exists
-                if (!is_dir($config['upload_path'])) {
-                    mkdir($config['upload_path'], 0777, TRUE);
-                }
-
-                $this->load->library('upload', $config);
-                $this->upload->initialize($config);
-                
-                if($this->upload->do_upload('product_image')) {
-                    $upload_data = $this->upload->data();
-                    
-                    // Get old image path
-                    $old_image = $this->model_products->getProductData($product_id)['image'];
-                    
-                    // Delete old image if it exists and is not the default image
-                    if($old_image && $old_image != 'no-image.jpg' && file_exists($config['upload_path'] . basename($old_image))) {
-                        unlink($config['upload_path'] . basename($old_image));
-                    }
-                    
-                    $data['image'] = 'assets/images/product_images/' . $upload_data['file_name'];
-                } else {
-                    $response['success'] = false;
-                    $response['message'] = $this->upload->display_errors();
-                    echo json_encode($response);
-                    return;
-                }
-            }
-
-            $update = $this->model_products->update($data, $product_id);
-            if($update) {
-                $response['success'] = true;
-                $response['message'] = 'Product "' . $this->input->post('product_name') . '" has been successfully updated';
-            } else {
-                $response['success'] = false;
-                $response['message'] = 'Error updating product';
-            }
-        } else {
-            $response['success'] = false;
-            $response['message'] = validation_errors();
+        
+        if ($this->form_validation->run() === FALSE) {
+            log_message('debug', 'Products update validation errors: ' . validation_errors());
+            echo json_encode([
+                "success" => false, 
+                "message" => strip_tags(validation_errors())
+            ]);
+            return;
         }
-
-        echo json_encode($response);
-	}
+        
+        // Get product data before update for logging
+        $product_before = $this->model_products->getProductData($product_id);
+        
+        // Prepare data for update
+        $data = [
+            'name' => $this->input->post('product_name'),
+            'sku' => $this->input->post('sku'),
+            'price' => $this->input->post('price'),
+            'qty' => $this->input->post('quantity'),
+            'description' => $this->input->post('description'),
+            'category_id' => $this->input->post('category'),
+            'brand_id' => $this->input->post('brand'),
+            'barcode' => $this->input->post('barcode'),
+            'availability' => $this->input->post('availability'),
+        ];
+        
+        // Handle product image if uploaded
+        if (!empty($_FILES['product_image']['name'])) {
+            $upload_path = 'assets/images/product_images/';
+            $config['upload_path'] = $upload_path;
+            $config['file_name'] = uniqid();
+            $config['allowed_types'] = 'gif|jpg|png|jpeg';
+            $config['max_size'] = '10000';
+            
+            $this->load->library('upload', $config);
+            $this->upload->initialize($config);
+            
+            if ($this->upload->do_upload('product_image')) {
+                $upload_data = $this->upload->data();
+                $data['image'] = $upload_path . $upload_data['file_name'];
+            }
+        }
+        
+        // Handle product data update
+        $result = $this->model_products->update($data, $product_id);
+        
+        if ($result) {
+            // Get updated product data for logging
+            $product_after = $this->model_products->getProductData($product_id);
+            
+            // Log successful product update with product SKU/ID
+            $this->logs->logActivity(
+                'update',
+                'Products',
+                'Updated product: ' . $product_after['name'] . ' (SKU: ' . $product_after['sku'] . ', ID: ' . $product_id . ')',
+                true
+            );
+            
+            echo json_encode(["success" => true, "message" => "Product updated successfully."]);
+        } else {
+            echo json_encode(["success" => false, "message" => "An error occurred. Please try again."]);
+        }
+    }
 
     /*
     * It removes the data from the database
     * and it returns the response into the json format
     */
-	public function remove()
-	{
-        if(!in_array('deleteProduct', $this->permission)) {
-            $response['success'] = false;
-            $response['message'] = 'You do not have permission to delete products.';
-        } else {
-            $product_ids = $this->input->post('product_ids');
-            
-            if(!empty($product_ids)) {
-                // Get product names before deletion
-                $this->db->select('id, name');
-                $this->db->where_in('id', $product_ids);
-                $query = $this->db->get('products');
-                $products = $query->result_array();
-                
-                $delete = $this->model_products->remove($product_ids);
-                if($delete) {
-                    $response['success'] = true;
-                    $response['products'] = $products;
-                    $response['count'] = count($products);
-                } else {
-                    $response['success'] = false;
-                    $response['message'] = 'Error occurred while removing product(s).';
-                }
-            } else {
-                $response['success'] = false;
-                $response['message'] = 'No products selected for deletion.';
-            }
+    public function remove()
+    {
+        if (!in_array('deleteProduct', $this->permission)) {
+            redirect('dashboard', 'refresh');
         }
+
+        // Check if we're getting a single product_id or an array of product_ids
+        $product_ids = $this->input->post('product_ids');
+        $product_id = $this->input->post('product_id');
         
-        echo json_encode($response);
-	}
+        // Handle both single product deletion and bulk deletion
+        if ($product_id) {
+            // Single product deletion
+            // Get product details before deletion for logging
+            $product = $this->model_products->getProductData($product_id);
+            
+            if (!$product) {
+                echo json_encode(["success" => false, "message" => "Product not found"]);
+                return;
+            }
+            
+            $delete = $this->model_products->remove($product_id);
+            
+            if ($delete) {
+                // Log successful product deletion with product SKU/ID
+                $this->logs->logActivity(
+                    'delete',
+                    'Products',
+                    'Deleted product: ' . $product['name'] . ' (SKU: ' . $product['sku'] . ', ID: ' . $product_id . ')',
+                    true
+                );
+                echo json_encode(["success" => true, "message" => "Product deleted successfully."]);
+            } else {
+                // Log failed deletion
+                $this->logs->logActivity(
+                    'delete',
+                    'Products',
+                    'Failed to delete product: ' . $product['name'] . ' (SKU: ' . $product['sku'] . ', ID: ' . $product_id . ')',
+                    false
+                );
+                echo json_encode(["success" => false, "message" => "An error occurred. Please try again."]);
+            }
+        } 
+        elseif ($product_ids && is_array($product_ids)) {
+            // Bulk product deletion
+            $deleted_products = [];
+            $failed_products = [];
+            
+            // Log start of bulk operation
+            log_message('debug', 'Starting bulk deletion of ' . count($product_ids) . ' products');
+            
+            if (empty($product_ids)) {
+                echo json_encode([
+                    "success" => false, 
+                    "message" => "No products were selected for deletion"
+                ]);
+                return;
+            }
+            
+            foreach ($product_ids as $id) {
+                // Validate ID is numeric
+                if (!is_numeric($id)) {
+                    $failed_products[] = ['id' => $id, 'reason' => 'Invalid product ID'];
+                    continue;
+                }
+                
+                $product = $this->model_products->getProductData($id);
+                
+                if (!$product) {
+                    $failed_products[] = ['id' => $id, 'reason' => 'Product not found'];
+                    continue;
+                }
+                
+                try {
+                    $delete = $this->model_products->remove($id);
+                    
+                    if ($delete) {
+                        $deleted_products[] = [
+                            'id' => $id,
+                            'name' => $product['name'],
+                            'sku' => $product['sku']
+                        ];
+                        
+                        // Log each successful deletion
+                        $this->logs->logActivity(
+                            'delete',
+                            'Products',
+                            'Deleted product: ' . $product['name'] . ' (SKU: ' . $product['sku'] . ', ID: ' . $id . ')',
+                            true
+                        );
+                    } else {
+                        $failed_products[] = [
+                            'id' => $id,
+                            'name' => $product['name'],
+                            'sku' => $product['sku'],
+                            'reason' => 'Database error'
+                        ];
+                        
+                        // Log each failed deletion
+                        $this->logs->logActivity(
+                            'delete',
+                            'Products',
+                            'Failed to delete product: ' . $product['name'] . ' (SKU: ' . $product['sku'] . ', ID: ' . $id . ')',
+                            false
+                        );
+                    }
+                } catch (Exception $e) {
+                    log_message('error', 'Exception during product deletion: ' . $e->getMessage());
+                    $failed_products[] = [
+                        'id' => $id,
+                        'name' => isset($product['name']) ? $product['name'] : 'Unknown',
+                        'sku' => isset($product['sku']) ? $product['sku'] : 'Unknown',
+                        'reason' => 'Exception: ' . $e->getMessage()
+                    ];
+                }
+            }
+            
+            // For very large deletions, just log the total count to minimize response size
+            $total_deleted = count($deleted_products);
+            $total_failed = count($failed_products);
+            
+            // Log overall bulk deletion
+            if ($total_deleted > 0) {
+                $this->logs->logActivity(
+                    'delete',
+                    'Products',
+                    'Bulk deletion completed: ' . $total_deleted . ' products deleted successfully, ' . 
+                    $total_failed . ' failed',
+                    true
+                );
+            }
+            
+            log_message('debug', 'Bulk deletion complete. Success: ' . $total_deleted . ', Failed: ' . $total_failed);
+            
+            echo json_encode([
+                "success" => !empty($deleted_products),
+                "message" => $total_deleted . " product(s) deleted successfully. " . 
+                             ($total_failed > 0 ? $total_failed . " product(s) failed." : ""),
+                "products" => $deleted_products,
+                "failed" => $failed_products,
+                "count" => $total_deleted
+            ]);
+        } 
+        else {
+            echo json_encode(["success" => false, "message" => "No product IDs provided"]);
+        }
+    }
 
     /*
     * Fetches a single product's details
@@ -617,6 +866,14 @@ public function create()
                                 }
                             }
                             
+                            // Log successful import
+                            $this->logs->logActivity(
+                                'Create', 
+                                'Products', 
+                                "Imported $success_count products with $error_count failures" . 
+                                (!empty($created_msg) ? " (" . implode(", ", $created_msg) . ")" : "")
+                            );
+                            
                             $response = array(
                                 'success' => true,
                                 'message' => $message,
@@ -626,6 +883,14 @@ public function create()
                                 $response['errors'] = $errors;
                             }
                         } else {
+                            // Log failed import
+                            $this->logs->logActivity(
+                                'Create', 
+                                'Products', 
+                                "Import failed. No products were imported. Error count: $error_count", 
+                                false
+                            );
+                            
                             $response = array(
                                 'success' => false,
                                 'message' => "Import failed. No products were imported.",
@@ -790,8 +1055,42 @@ public function create()
      * Check if product field value already exists in database
      * Used for AJAX validation to prevent duplicate entries
      */
-    public function check_duplicate()
+    public function check_duplicate($str = NULL)
     {
+        // This is called in two contexts:
+        // 1. As a form_validation callback (where $str is passed)
+        // 2. As a direct AJAX endpoint (where POST parameters are used)
+        
+        // If this is a callback validation
+        if ($str !== NULL) {
+            // Get the field name from the validation context
+            $field = $this->input->post('sku') ? 'sku' : ($this->input->post('barcode') ? 'barcode' : 'name');
+            $value = $str;
+            $product_id = $this->input->post('product_id');
+            
+            log_message('debug', 'Callback check_duplicate for ' . $field . ': ' . $value);
+            
+            // Set up the query
+            $this->db->where($field, $value);
+            
+            // Exclude current product if editing
+            if ($product_id) {
+                $this->db->where('id !=', $product_id);
+            }
+            
+            // Execute query
+            $query = $this->db->get('products');
+            
+            // If it's duplicate, return FALSE (validation fails)
+            if ($query->num_rows() > 0) {
+                $this->form_validation->set_message('check_duplicate', 'The {field} already exists.');
+                return FALSE;
+            }
+            
+            return TRUE;
+        }
+        
+        // If this is an AJAX call
         // Check permission
         if (!in_array('createProduct', $this->permission) && !in_array('updateProduct', $this->permission)) {
             echo json_encode(['duplicate' => false]);
@@ -802,6 +1101,8 @@ public function create()
         $field = $this->input->post('field');
         $value = $this->input->post('value');
         $product_id = $this->input->post('product_id');
+        
+        log_message('debug', 'AJAX check_duplicate for ' . $field . ': ' . $value);
         
         // Validate field parameter
         $allowed_fields = ['name', 'sku', 'barcode'];
@@ -823,6 +1124,116 @@ public function create()
         
         // Return result
         echo json_encode(['duplicate' => ($query->num_rows() > 0)]);
+    }
+
+    public function archive()
+    {
+        // Permission checking
+        if(!in_array('deleteProduct', $this->permission)) {
+            redirect('dashboard', 'refresh');
+        }
+
+        $product_id = $this->input->post('product_id');
+        
+        // Get product data before archiving
+        $product_data = $this->model_products->getProductData($product_id);
+        
+        if($product_id) {
+            $delete = $this->model_products->archive($product_id);
+            
+            if($delete == true) {
+                // Product archived successfully
+                $this->logs->logActivity(
+                    'Archive',
+                    'Products',
+                    "Product archived: " . $product_data['name'] . " (ID: $product_id)",
+                    true
+                );
+                
+                $response['success'] = true;
+                $response['messages'] = 'Successfully archived';
+            }
+            else {
+                // Archive failed
+                $this->logs->logActivity(
+                    'Archive',
+                    'Products',
+                    "Failed to archive product: " . ($product_data ? $product_data['name'] : "ID: $product_id"),
+                    false
+                );
+                
+                $response['success'] = false;
+                $response['messages'] = 'Error in the database while archiving the product information';
+            }
+        }
+        else {
+            $this->logs->logActivity(
+                'Archive',
+                'Products',
+                "Failed to archive product: No product ID provided",
+                false
+            );
+            
+            $response['success'] = false;
+            $response['messages'] = 'Error in the database while archiving the product information';
+        }
+
+        echo json_encode($response);
+    }
+
+    public function restore()
+    {
+        // Permission checking
+        if(!in_array('updateProduct', $this->permission)) {
+            redirect('dashboard', 'refresh');
+        }
+
+        $product_id = $this->input->post('product_id');
+        
+        // Get product data before restoring
+        $product_data = $this->model_products->getProductData($product_id);
+        
+        if($product_id) {
+            $restore = $this->model_products->restore($product_id);
+            
+            if($restore == true) {
+                // Product restored successfully
+                $this->logs->logActivity(
+                    'Restore',
+                    'Products',
+                    "Product restored: " . $product_data['name'] . " (ID: $product_id)",
+                    true
+                );
+                
+                $response['success'] = true;
+                $response['messages'] = 'Successfully restored';
+            }
+            else {
+                // Restore failed
+                $this->logs->logActivity(
+                    'Restore',
+                    'Products',
+                    "Failed to restore product: " . ($product_data ? $product_data['name'] : "ID: $product_id"),
+                    false
+                );
+                
+                $response['success'] = false;
+                $response['messages'] = 'Error in the database while restoring the product information';
+            }
+        }
+        else {
+            $this->logs->logActivity(
+                'Restore',
+                'Products',
+                "Failed to restore product: No product ID provided",
+                false
+            );
+            
+            $response['success'] = false;
+            $response['messages'] = 'Error in the database while restoring the product information';
+        }
+
+        echo json_encode($response);
     }
 
 }

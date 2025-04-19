@@ -261,6 +261,24 @@
                         </td>
                       </tr>
                       <tr>
+                    <td>Logs</td>
+                    <td class="text-center">
+                      <div>-</div>
+                    </td>
+                    <td class="text-center">
+                      <div>-</div>
+                    </td>
+                    <td class="text-center">
+                      <div>
+                        <input type="checkbox" id="viewLog" name="permission[]" value="viewLog" data-switch="success">
+                        <label for="viewLog" data-on-label="Yes" data-off-label="No" class="mb-0 d-block"></label>
+                      </div>
+                    </td>
+                    <td class="text-center">
+                      <div>-</div>
+                    </td>
+                  </tr>
+                      <tr>
                         <td>Setting</td>
                         <td class="text-center">
                           <div>-</div>

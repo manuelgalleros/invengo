@@ -36,20 +36,64 @@ class Model_users extends CI_Model
 
 	public function create($data = '', $group_id = null)
 	{
+		// Log inputs for debugging
+		log_message('debug', 'Model_users create - data: ' . json_encode($data));
+		log_message('debug', 'Model_users create - group_id: ' . json_encode($group_id));
 
-		if($data && $group_id) {
+		if(empty($data) || empty($group_id)) {
+			log_message('error', 'Model_users create - empty data or group_id');
+			return false;
+		}
+
+		try {
+			$this->db->trans_begin();
+			
+			// Insert user data
 			$create = $this->db->insert('users', $data);
+			
+			if (!$create) {
+				log_message('error', 'Model_users create - failed to insert user: ' . $this->db->error()['message']);
+				$this->db->trans_rollback();
+				return false;
+			}
 
 			$user_id = $this->db->insert_id();
+			
+			if (!$user_id) {
+				log_message('error', 'Model_users create - no insert ID returned');
+				$this->db->trans_rollback();
+				return false;
+			}
 
+			// Prepare group data
 			$group_data = array(
 				'user_id' => $user_id,
 				'group_id' => $group_id
 			);
 
-			$group_data = $this->db->insert('user_group', $group_data);
+			// Insert group data
+			$group_insert = $this->db->insert('user_group', $group_data);
+			
+			if (!$group_insert) {
+				log_message('error', 'Model_users create - failed to insert user_group: ' . $this->db->error()['message']);
+				$this->db->trans_rollback();
+				return false;
+			}
 
-			return ($create == true && $group_data) ? true : false;
+			// Commit transaction if all went well
+			if ($this->db->trans_status() === FALSE) {
+				log_message('error', 'Model_users create - transaction failed');
+				$this->db->trans_rollback();
+				return false;
+			}
+			
+			$this->db->trans_commit();
+			log_message('debug', 'Model_users create - successfully created user ID: ' . $user_id);
+			return true;
+		} catch (Exception $e) {
+			log_message('error', 'Model_users create - exception: ' . $e->getMessage());
+			$this->db->trans_rollback();
+			return false;
 		}
 	}
 

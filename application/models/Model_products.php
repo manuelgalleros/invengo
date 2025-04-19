@@ -151,8 +151,9 @@ class Model_products extends CI_Model
 	{
 		if($data) {
 			$insert = $this->db->insert('products', $data);
-			return ($insert == true) ? true : false;
+			return ($insert == true) ? $this->db->insert_id() : false;
 		}
+		return false;
 	}
     
     public function insertProductImage($imageData) {

@@ -900,6 +900,11 @@ function debounce(func, wait) {
 const debouncedCheckDuplicate = debounce(async function(element, field, productId = null) {
     try {
         const value = $(element).val();
+        // Skip empty values
+        if (!value.trim()) {
+            return;
+        }
+        
         const isDuplicate = await checkDuplicateField(field, value, productId);
         
         if (isDuplicate) {
@@ -931,6 +936,7 @@ const debouncedCheckDuplicate = debounce(async function(element, field, productI
                 $(element).removeClass('is-invalid');
                 errorMessage.remove();
             }
+            // Don't modify any other validation states
         }
     } catch (error) {
         console.error("Error checking duplicate:", error);
@@ -1216,6 +1222,7 @@ $('.dropdown-menu .dropdown-item').click(function(e) {
                 success: function(response) {
                     if(response.success) {
                         let product = response.data;
+                        console.log("Product data received:", product);
                         
                         // Populate the edit form with product data
                         $('#edit_product_id').val(product.id);
@@ -1273,6 +1280,12 @@ $("#editProductForm").submit(function (e) {
     }
     
     let formData = new FormData(this);
+    
+    // Debug: Log form data
+    console.log("Form data being submitted:");
+    for (let pair of formData.entries()) {
+        console.log(pair[0] + ': ' + pair[1]);
+    }
 
     $.ajax({
         url: "<?php echo base_url('products/update'); ?>",
@@ -1339,12 +1352,15 @@ $('#removeForm').on('submit', function(e) {
     e.preventDefault();
     var productIds = JSON.parse($('#removeProductIds').val());
     
+    console.log('Submitting delete request for', productIds.length, 'products');
+    
     $.ajax({
         url: "<?php echo base_url('products/remove'); ?>",
         type: 'POST',
         data: { product_ids: productIds },
         dataType: 'json',
         success: function(response) {
+            console.log('Delete response:', response);
             if (response.success) {
                 $('#removeModal').modal('hide');
                 
@@ -1352,10 +1368,16 @@ $('#removeForm').on('submit', function(e) {
                 let message = '';
                 if (response.count === 1) {
                     message = `${response.products[0].name} was successfully deleted`;
-                } else {
+                } else if (response.count <= 5) {
+                    // For a small number of products, show all names
                     let productNames = response.products.map(p => p.name).join(', ');
                     message = `${productNames} were successfully deleted`;
+                } else {
+                    // For many products, just show the count
+                    message = `${response.count} products were successfully deleted`;
                 }
+                
+                console.log('Success message:', message);
                 
                 $('#messages').html(`
                     <div class="alert alert-info text-bg-info alert-dismissible d-flex align-items-center" role="alert">

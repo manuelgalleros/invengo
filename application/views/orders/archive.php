@@ -38,12 +38,12 @@
                             </div>
                             <div class="d-flex gap-1">
                                 <?php if(in_array('viewOrder', $user_permission)): ?>
-                                    <a href="<?php echo base_url('orders') ?>" class="btn btn-soft-info">
-                                        <i class="ti ti-arrow-left me-1"></i> Back to Orders
-                                    </a>
                                     <button type="button" class="btn btn-light" id="showArchivedOrdersBtn">
                                         <i class="ti ti-eye align-middle me-1 fs-18"></i> Show Archived Orders
                                     </button>
+                                    <a href="<?php echo base_url('orders') ?>" class="btn btn-soft-info">
+                                        <i class="ti ti-arrow-left me-1"></i> Back to Orders
+                                    </a>
                                 <?php endif; ?>
                                 <div class="dropdown order-actions" style="display: none;">
                                     <button type="button" class="btn btn-danger dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
@@ -608,14 +608,41 @@ $('#restoreForm').on('submit', function(e) {
                 autoDismissMessages();
             }
         },
-        error: function() {
-            $('#messages').html(`
-                <div class="alert alert-danger text-bg-danger alert-dismissible d-flex align-items-center" role="alert">
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
-                    <iconify-icon icon="solar:danger-triangle-bold-duotone" class="fs-20 me-1"></iconify-icon>
-                    <div class="lh-1">Error restoring order(s). Please try again.</div>
-                </div>
-            `);
+        error: function(xhr, status, error) {
+            console.error('Restore AJAX Error:', status, error);
+            console.log('Response Text:', xhr.responseText);
+            
+            try {
+                // Try to parse response as JSON
+                var errorResponse = JSON.parse(xhr.responseText);
+                var errorMessage = errorResponse.messages || 'Error restoring order(s). Please try again.';
+                
+                $('#messages').html(`
+                    <div class="alert alert-danger text-bg-danger alert-dismissible d-flex align-items-center" role="alert">
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+                        <iconify-icon icon="solar:danger-triangle-bold-duotone" class="fs-20 me-1"></iconify-icon>
+                        <div class="lh-1">${errorMessage}</div>
+                    </div>
+                `);
+            } catch (e) {
+                // If not valid JSON, show response text or default error
+                let errorDetail = xhr.responseText ? 
+                    `<div class="small text-truncate mt-1">${xhr.responseText.substring(0, 100)}${xhr.responseText.length > 100 ? '...' : ''}</div>` : '';
+                
+                $('#messages').html(`
+                    <div class="alert alert-danger text-bg-danger alert-dismissible d-flex align-items-center" role="alert">
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+                        <iconify-icon icon="solar:danger-triangle-bold-duotone" class="fs-20 me-1"></iconify-icon>
+                        <div class="lh-1">
+                            Error restoring order(s). Please try again.
+                            ${errorDetail}
+                        </div>
+                    </div>
+                `);
+            }
+            
+            // Close the modal even on error
+            $('#restoreModal').modal('hide');
             autoDismissMessages();
         }
     });

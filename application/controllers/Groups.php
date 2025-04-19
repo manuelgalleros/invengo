@@ -13,6 +13,7 @@ class Groups extends Admin_Controller
 
 		$this->load->model('model_groups');
 		$this->load->model('model_users');
+		$this->load->library('logs');
 	}
 
 	/* 
@@ -61,6 +62,14 @@ class Groups extends Admin_Controller
 
         	$create = $this->model_groups->create($data);
         	if($create == true) {
+                // Log successful group creation
+                $this->logs->logActivity(
+                    'create',
+                    'Groups',
+                    'Created new group: ' . $data['group_name'],
+                    true
+                );
+                
         		if($this->input->is_ajax_request()) {
         			// Clear any existing flash messages
         			$this->session->unset_userdata('success');
@@ -79,6 +88,14 @@ class Groups extends Admin_Controller
         		redirect('groups/', 'refresh');
         	}
         	else {
+                // Log failed group creation
+                $this->logs->logActivity(
+                    'create',
+                    'Groups',
+                    'Failed to create group: ' . $data['group_name'],
+                    false
+                );
+                
         		if($this->input->is_ajax_request()) {
         			// Clear any existing flash messages
         			$this->session->unset_userdata('success');
@@ -139,6 +156,14 @@ class Groups extends Admin_Controller
 
 	        	$update = $this->model_groups->edit($data, $id);
 	        	if($update == true) {
+                    // Log successful group update
+                    $this->logs->logActivity(
+                        'update',
+                        'Groups',
+                        'Updated group: ' . $data['group_name'],
+                        true
+                    );
+                    
 	        		if($this->input->is_ajax_request()) {
 	        			// Clear any existing flash messages to prevent them from showing on page refresh
 	        			$this->session->unset_userdata('success');
@@ -156,6 +181,14 @@ class Groups extends Admin_Controller
 	        		redirect('groups/', 'refresh');
 	        	}
 	        	else {
+                    // Log failed group update
+                    $this->logs->logActivity(
+                        'update',
+                        'Groups',
+                        'Failed to update group: ' . $data['group_name'],
+                        false
+                    );
+                    
 	        		if($this->input->is_ajax_request()) {
 	        			// Clear any existing flash messages to prevent them from showing on page refresh
 	        			$this->session->unset_userdata('success');
@@ -202,66 +235,52 @@ class Groups extends Admin_Controller
 		}
 
 		if($id) {
-			// Get group info before deletion for the response
-			$group_data = $this->model_groups->getGroupData($id);
-			$group_name = $group_data ? $group_data['group_name'] : '';
-
-			// For AJAX requests
-			if($this->input->is_ajax_request()) {
-				// Clear any existing flash messages to prevent them from showing on page refresh
-				$this->session->unset_userdata('success');
-				$this->session->unset_userdata('error');
+			if(!$this->model_groups->existInUserGroup($id)) {
+				// Get group data before deletion for logging
+				$group_data = $this->model_groups->getGroupData($id);
 				
-				$check = $this->model_groups->existInUserGroup($id);
-				if($check == true) {
-					echo json_encode([
-						'success' => false, 
-						'message' => 'Group exists in the users'
-					]);
-					return;
+				$delete = $this->model_groups->delete($id);
+				if($delete == true) {
+					// Log successful group deletion
+					$this->logs->logActivity(
+						'delete',
+						'Groups',
+						'Deleted group: ' . $group_data['group_name'],
+						true
+					);
+					
+					if($this->input->is_ajax_request()) {
+						echo json_encode(['success' => true, 'message' => 'Successfully deleted']);
+						return;
+					}
+					$this->session->set_flashdata('success', 'Successfully removed');
+					redirect('groups/', 'refresh');
 				}
 				else {
-					$delete = $this->model_groups->delete($id);
-					if($delete == true) {
-						echo json_encode([
-							'success' => true, 
-							'message' => 'Successfully removed',
-							'group_name' => $group_name
-						]);
+					// Log failed group deletion
+					$this->logs->logActivity(
+						'delete',
+						'Groups',
+						'Failed to delete group: ' . $group_data['group_name'],
+						false
+					);
+					
+					if($this->input->is_ajax_request()) {
+						echo json_encode(['success' => false, 'message' => 'Error occurred!!']);
 						return;
 					}
-					else {
-						echo json_encode([
-							'success' => false, 
-							'message' => 'Error occurred!!'
-						]);
-						return;
-					}
+					$this->session->set_flashdata('error', 'Error occurred!!');
+					redirect('groups/', 'refresh');
 				}
 			}
-			// For regular form submissions
-			else if($this->input->post('confirm')) {
-				$check = $this->model_groups->existInUserGroup($id);
-				if($check == true) {
-					$this->session->set_flashdata('error', 'Group exists in the users');
-	        		redirect('groups/', 'refresh');
-				}
-				else {
-					$delete = $this->model_groups->delete($id);
-					if($delete == true) {
-		        		$this->session->set_flashdata('success', 'Successfully removed');
-		        		redirect('groups/', 'refresh');
-		        	}
-		        	else {
-		        		$this->session->set_flashdata('error', 'Error occurred!!');
-		        		redirect('groups/delete/'.$id, 'refresh');
-		        	}
-				}	
-			}	
 			else {
-				$this->data['id'] = $id;
-				$this->render_template('groups/delete', $this->data);
-			}	
+				if($this->input->is_ajax_request()) {
+					echo json_encode(['success' => false, 'message' => 'This group is already in use']);
+					return;
+				}
+				$this->session->set_flashdata('error', 'This group is already in use');
+				redirect('groups/', 'refresh');
+			}
 		}
 	}
 

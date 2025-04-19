@@ -13,6 +13,7 @@ class Brands extends Admin_Controller
 		$this->data['page_title'] = 'Manage Brands';
         $this->load->model('model_users');
 		$this->load->model('model_brands');
+		$this->load->library('logs');
 	}
 
 	/* 
@@ -111,10 +112,29 @@ class Brands extends Admin_Controller
 
         	$create = $this->model_brands->create($data);
         	if($create == true) {
+                // Get the newly inserted brand ID
+                $brand_id = $this->db->insert_id();
+                
+                // Log successful brand creation with brand ID
+                $this->logs->logActivity(
+                    'create',
+                    'Brands',
+                    'Created new brand: ' . $data['name'] . ' (ID: ' . $brand_id . ')',
+                    true
+                );
+                
         		$response['success'] = true;
         		$response['messages'] = 'Successfully created';
         	}
         	else {
+                // Log failed brand creation
+                $this->logs->logActivity(
+                    'create',
+                    'Brands',
+                    'Failed to create brand: ' . $data['name'],
+                    false
+                );
+                
         		$response['success'] = false;
         		$response['messages'] = 'Error in the database while creating the brand information';			
         	}
@@ -157,10 +177,26 @@ class Brands extends Admin_Controller
 
 	        	$update = $this->model_brands->update($data, $brand_id);
 	        	if($update == true) {
+                    // Log successful brand update with brand ID
+                    $this->logs->logActivity(
+                        'update',
+                        'Brands',
+                        'Updated brand: ' . $data['name'] . ' (ID: ' . $brand_id . ')',
+                        true
+                    );
+                    
 	        		$response['success'] = true;
 	        		$response['messages'] = 'Successfully updated';
 	        	}
 	        	else {
+                    // Log failed brand update with brand ID
+                    $this->logs->logActivity(
+                        'update',
+                        'Brands',
+                        'Failed to update brand: ' . $data['name'] . ' (ID: ' . $brand_id . ')',
+                        false
+                    );
+                    
 	        		$response['success'] = false;
 	        		$response['messages'] = 'Error in the database while updating the brand information';			
 	        	}
@@ -191,22 +227,111 @@ class Brands extends Admin_Controller
 		}
 		
 		$brand_id = $this->input->post('brand_id');
+		$brand_ids = $this->input->post('brand_ids');
 		$response = array();
-		if($brand_id) {
+		
+		// Debug the input values
+		log_message('debug', 'Brand remove - brand_id: ' . (is_array($brand_id) ? 'ARRAY' : $brand_id));
+		log_message('debug', 'Brand remove - brand_ids: ' . (is_array($brand_ids) ? json_encode($brand_ids) : $brand_ids));
+		
+		// Handle bulk deletion with brand_ids
+		if ($brand_ids) {
+		    // Convert to array if it's a JSON string
+		    if (!is_array($brand_ids) && is_string($brand_ids)) {
+		        $brand_ids = json_decode($brand_ids, true);
+		    }
+		    
+		    if (is_array($brand_ids)) {
+		        $deleted_brands = [];
+		        $failed_brands = [];
+		        
+		        foreach ($brand_ids as $id) {
+                    // Get brand data before deletion for logging
+                    $brand_data = $this->model_brands->getBrandData($id);
+                    $brand_name = (is_array($brand_data) && isset($brand_data['name'])) ? $brand_data['name'] : 'Unknown';
+                    
+                    $delete = $this->model_brands->remove($id);
+                    
+                    if ($delete) {
+                        $deleted_brands[] = $brand_name;
+                        
+                        // Log each successful deletion
+                        $this->logs->logActivity(
+                            'delete',
+                            'Brands',
+                            'Deleted brand: ' . $brand_name . ' (ID: ' . $id . ')',
+                            true
+                        );
+                    } else {
+                        $failed_brands[] = $brand_name;
+                        
+                        // Log each failed deletion
+                        $this->logs->logActivity(
+                            'delete',
+                            'Brands',
+                            'Failed to delete brand: ' . $brand_name . ' (ID: ' . $id . ')',
+                            false
+                        );
+                    }
+		        }
+		        
+		        // Set response based on results
+		        if (count($deleted_brands) > 0) {
+		            $response['success'] = true;
+		            $response['messages'] = count($deleted_brands) . " brand(s) successfully removed";
+		            if (count($failed_brands) > 0) {
+		                $response['messages'] .= ", " . count($failed_brands) . " failed";
+		            }
+		        } else {
+		            $response['success'] = false;
+		            $response['messages'] = "Failed to remove brands";
+		        }
+		    } else {
+		        $response['success'] = false;
+		        $response['messages'] = "Invalid brand IDs format";
+		    }
+		}
+		// Handle single brand deletion
+		else if($brand_id) {
+		    // If brand_id is somehow an array, use just the first element
+		    if (is_array($brand_id)) {
+		        $brand_id = $brand_id[0];
+		    }
+		    
+            // Get brand data before deletion for logging
+            $brand_data = $this->model_brands->getBrandData($brand_id);
+            $brand_name = (is_array($brand_data) && isset($brand_data['name'])) ? $brand_data['name'] : 'Unknown';
+            
 			$delete = $this->model_brands->remove($brand_id);
 
 			if($delete == true) {
+                // Log successful brand deletion
+                $this->logs->logActivity(
+                    'delete',
+                    'Brands',
+                    'Deleted brand: ' . $brand_name . ' (ID: ' . $brand_id . ')',
+                    true
+                );
+                
 				$response['success'] = true;
 				$response['messages'] = "Successfully removed";	
 			}
 			else {
+                // Log failed brand deletion
+                $this->logs->logActivity(
+                    'delete',
+                    'Brands',
+                    'Failed to delete brand: ' . $brand_name . ' (ID: ' . $brand_id . ')',
+                    false
+                );
+                
 				$response['success'] = false;
-				$response['messages'] = "Error in the database while removing the brand information";
+				$response['messages'] = 'Error in the database while removing the brand information';
 			}
 		}
 		else {
 			$response['success'] = false;
-			$response['messages'] = "Refresh the page again!!";
+			$response['messages'] = "No brands selected for deletion";
 		}
 
 		echo json_encode($response);

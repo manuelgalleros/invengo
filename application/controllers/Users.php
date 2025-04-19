@@ -13,6 +13,7 @@ class Users extends Admin_Controller
 
 		$this->load->model('model_users');
 		$this->load->model('model_groups');
+		$this->load->library('logs');
 	}
 
 	
@@ -47,24 +48,24 @@ class Users extends Admin_Controller
 	public function create()
 	{
 		if(!in_array('createUser', $this->permission)) {
-            if($this->input->is_ajax_request()) {
-                echo json_encode(['success' => false, 'errors' => 'Permission denied']);
-                return;
-            }
 			redirect('dashboard', 'refresh');
 		}
-		
-		$this->form_validation->set_rules('groups', 'Group', 'required');
+
 		$this->form_validation->set_rules('username', 'Username', 'trim|required|min_length[5]|max_length[12]|is_unique[users.username]');
-		$this->form_validation->set_rules('email', 'Email', 'trim|required|is_unique[users.email]');
+		$this->form_validation->set_rules('email', 'Email', 'trim|required|is_unique[users.email]|valid_email');
 		$this->form_validation->set_rules('password', 'Password', 'trim|required|min_length[8]');
-		$this->form_validation->set_rules('cpassword', 'Confirm password', 'trim|required|matches[password]');
 		$this->form_validation->set_rules('fname', 'First name', 'trim|required');
 		$this->form_validation->set_rules('gender', 'Gender', 'trim|required');
 
         if ($this->form_validation->run() == TRUE) {
             // true case
             $password = $this->password_hash($this->input->post('password'));
+            
+            // Log debug information about the submission
+            log_message('debug', 'User create - form validation passed');
+            log_message('debug', 'User create - username: ' . $this->input->post('username'));
+            log_message('debug', 'User create - email: ' . $this->input->post('email'));
+            log_message('debug', 'User create - groups: ' . json_encode($this->input->post('groups')));
             
             // Handle image upload
             $profile_image = 'default.jpg'; // Default image
@@ -92,7 +93,9 @@ class Users extends Admin_Controller
                 if($this->upload->do_upload('profile_image')) {
                     $upload_data = $this->upload->data();
                     $profile_image = $upload_data['file_name'];
+                    log_message('debug', 'User create - profile image uploaded: ' . $profile_image);
                 } else {
+                    log_message('error', 'User create - profile image upload failed: ' . $this->upload->display_errors());
                     if($this->input->is_ajax_request()) {
                         echo json_encode(['success' => false, 'errors' => $this->upload->display_errors()]);
                         return;
@@ -114,31 +117,78 @@ class Users extends Admin_Controller
                 'profile_image' => $profile_image
         	);
 
-        	$create = $this->model_users->create($data, $this->input->post('groups'));
-        	if($create == true) {
-                if($this->input->is_ajax_request()) {
-                    echo json_encode([
-                        'success' => true, 
-                        'message' => 'Successfully created user "' . $this->input->post('username') . '"',
-                        'redirect' => base_url('users/')
-                    ]);
-                    return;
+            // Log the data being sent to the model
+            log_message('debug', 'User create - data being sent to model: ' . json_encode($data));
+            log_message('debug', 'User create - groups being sent to model: ' . json_encode($this->input->post('groups')));
+            
+            try {
+                $create = $this->model_users->create($data, $this->input->post('groups'));
+                
+                if($create == true) {
+                    // Log successful user creation
+                    log_message('debug', 'User create - user created successfully');
+                    $this->logs->logActivity(
+                        'create',
+                        'Users',
+                        'Created new user: ' . $data['username'] . ' (' . $data['email'] . ')',
+                        true
+                    );
+                    
+                    if($this->input->is_ajax_request()) {
+                        echo json_encode([
+                            'success' => true, 
+                            'message' => 'Successfully created user "' . $this->input->post('username') . '"',
+                            'redirect' => base_url('users/')
+                        ]);
+                        return;
+                    }
+                    $this->session->set_flashdata('success', 'Successfully created');
+                    redirect('users/', 'refresh');
                 }
-        		$this->session->set_flashdata('success', 'Successfully created');
-        		redirect('users/', 'refresh');
-        	}
-        	else {
-        		// If user creation fails, delete the uploaded image
-                if($profile_image != 'default.jpg') {
+                else {
+                    // If user creation fails, delete the uploaded image
+                    if($profile_image != 'default.jpg') {
+                        unlink('./assets/images/users/' . $profile_image);
+                    }
+                    
+                    // Log failed user creation
+                    log_message('error', 'User create - failed to create user in model');
+                    $this->logs->logActivity(
+                        'create',
+                        'Users',
+                        'Failed to create user: ' . $data['username'] . ' (' . $data['email'] . ')',
+                        false
+                    );
+                    
+                    if($this->input->is_ajax_request()) {
+                        echo json_encode(['success' => false, 'errors' => 'Error occurred while creating user']);
+                        return;
+                    }
+                    $this->session->set_flashdata('error', 'Error occurred!!');
+                    redirect('users/create', 'refresh');
+                }
+            } catch (Exception $e) {
+                // If an exception occurs, delete the uploaded image
+                if($profile_image != 'default.jpg' && file_exists('./assets/images/users/' . $profile_image)) {
                     unlink('./assets/images/users/' . $profile_image);
                 }
+                
+                // Log the exception
+                log_message('error', 'User create - exception: ' . $e->getMessage());
+                $this->logs->logActivity(
+                    'create',
+                    'Users',
+                    'Exception while creating user: ' . $data['username'] . ' - ' . $e->getMessage(),
+                    false
+                );
+                
                 if($this->input->is_ajax_request()) {
-                    echo json_encode(['success' => false, 'errors' => 'Error occurred while creating user']);
+                    echo json_encode(['success' => false, 'errors' => 'Exception occurred: ' . $e->getMessage()]);
                     return;
                 }
-        		$this->session->set_flashdata('error', 'Error occurred!!');
-        		redirect('users/create', 'refresh');
-        	}
+                $this->session->set_flashdata('error', 'Exception occurred: ' . $e->getMessage());
+                redirect('users/create', 'refresh');
+            }
         }
         else {
             // false case - validation failed
@@ -146,13 +196,34 @@ class Users extends Admin_Controller
                 // Get all validation errors
                 $errors = array();
                 
+                // Log validation errors
+                log_message('debug', 'User create - validation failed');
+                
                 // Add form validation errors
-                if(form_error('groups')) $errors[] = strip_tags(form_error('groups'));
-                if(form_error('username')) $errors[] = strip_tags(form_error('username'));
-                if(form_error('email')) $errors[] = strip_tags(form_error('email'));
-                if(form_error('password')) $errors[] = strip_tags(form_error('password'));
-                if(form_error('cpassword')) $errors[] = strip_tags(form_error('cpassword'));
-                if(form_error('fname')) $errors[] = strip_tags(form_error('fname'));
+                if(form_error('groups')) {
+                    $errors[] = strip_tags(form_error('groups'));
+                    log_message('debug', 'User create - groups validation error: ' . strip_tags(form_error('groups')));
+                }
+                if(form_error('username')) {
+                    $errors[] = strip_tags(form_error('username'));
+                    log_message('debug', 'User create - username validation error: ' . strip_tags(form_error('username')));
+                }
+                if(form_error('email')) {
+                    $errors[] = strip_tags(form_error('email'));
+                    log_message('debug', 'User create - email validation error: ' . strip_tags(form_error('email')));
+                }
+                if(form_error('password')) {
+                    $errors[] = strip_tags(form_error('password'));
+                    log_message('debug', 'User create - password validation error: ' . strip_tags(form_error('password')));
+                }
+                if(form_error('cpassword')) {
+                    $errors[] = strip_tags(form_error('cpassword'));
+                    log_message('debug', 'User create - cpassword validation error: ' . strip_tags(form_error('cpassword')));
+                }
+                if(form_error('fname')) {
+                    $errors[] = strip_tags(form_error('fname'));
+                    log_message('debug', 'User create - fname validation error: ' . strip_tags(form_error('fname')));
+                }
                 
                 echo json_encode(['success' => false, 'errors' => $errors]);
                 return;
@@ -273,6 +344,14 @@ class Users extends Admin_Controller
 
 		        	$update = $this->model_users->edit($data, $id, $this->input->post('groups'));
 		        	if($update == true) {
+                        // Log successful user update
+                        $this->logs->logActivity(
+                            'update',
+                            'Users',
+                            'Updated user: ' . $data['username'] . ' (ID: ' . $id . ')',
+                            true
+                        );
+                        
 		        		if($this->input->is_ajax_request()) {
 							echo json_encode([
 								'success' => true,
@@ -284,6 +363,14 @@ class Users extends Admin_Controller
 		        		redirect('users/', 'refresh');
 		        	}
 		        	else {
+                        // Log failed user update
+                        $this->logs->logActivity(
+                            'update',
+                            'Users',
+                            'Failed to update user: ' . $data['username'] . ' (ID: ' . $id . ')',
+                            false
+                        );
+                        
 		        		if($this->input->is_ajax_request()) {
 							echo json_encode(['success' => false, 'errors' => 'Error occurred while updating user']);
 							return;
@@ -357,6 +444,14 @@ class Users extends Admin_Controller
 
 			        	$update = $this->model_users->edit($data, $id, $this->input->post('groups'));
 			        	if($update == true) {
+                            // Log successful user update with password change
+                            $this->logs->logActivity(
+                                'update',
+                                'Users',
+                                'Updated user with password change: ' . $data['username'] . ' (ID: ' . $id . ')',
+                                true
+                            );
+                            
 			        		if($this->input->is_ajax_request()) {
 								echo json_encode([
 									'success' => true,
@@ -368,6 +463,14 @@ class Users extends Admin_Controller
 			        		redirect('users/', 'refresh');
 			        	}
 			        	else {
+                            // Log failed user update with password change
+                            $this->logs->logActivity(
+                                'update',
+                                'Users',
+                                'Failed to update user with password change: ' . $data['username'] . ' (ID: ' . $id . ')',
+                                false
+                            );
+                            
 			        		if($this->input->is_ajax_request()) {
 								echo json_encode(['success' => false, 'errors' => 'Error occurred while updating user']);
 								return;
@@ -460,6 +563,14 @@ class Users extends Admin_Controller
 						}
 					}
 					
+					// Log successful user deletion
+					$this->logs->logActivity(
+						'delete',
+						'Users',
+						'Deleted user: ' . $user_data['username'] . ' (ID: ' . $id . ')',
+						true
+					);
+					
 					if($this->input->is_ajax_request()) {
 						echo json_encode(['success' => true, 'message' => 'User successfully deleted']);
 						return;
@@ -468,6 +579,14 @@ class Users extends Admin_Controller
 					redirect('users/', 'refresh');
 				}
 				else {
+					// Log failed user deletion
+					$this->logs->logActivity(
+						'delete',
+						'Users',
+						'Failed to delete user: ' . $user_data['username'] . ' (ID: ' . $id . ')',
+						false
+					);
+					
 					if($this->input->is_ajax_request()) {
 						$this->output->set_status_header(500);
 						echo json_encode(['success' => false, 'message' => 'Error occurred while deleting user']);
@@ -570,10 +689,24 @@ class Users extends Admin_Controller
 
 		        	$update = $this->model_users->edit($data, $id);
 		        	if($update == true) {
+                        // Log successful profile update
+                        $this->logs->logActivity(
+                            'update',
+                            'Users',
+                            'Updated profile settings for: ' . $data['username'],
+                            true
+                        );
 		        		$this->session->set_flashdata('success', 'Successfully updated');
 		        		redirect('users/setting/', 'refresh');
 		        	}
 		        	else {
+                        // Log failed profile update
+                        $this->logs->logActivity(
+                            'update',
+                            'Users',
+                            'Failed to update profile settings for: ' . $data['username'],
+                            false
+                        );
 		        		$this->session->set_flashdata('errors', 'Error occurred!!');
 		        		redirect('users/setting/', 'refresh');
 		        	}
@@ -598,10 +731,24 @@ class Users extends Admin_Controller
 
 			        	$update = $this->model_users->edit($data, $id, $this->input->post('groups'));
 			        	if($update == true) {
+                            // Log successful profile update with password change
+                            $this->logs->logActivity(
+                                'update',
+                                'Users',
+                                'Updated profile settings with password change for: ' . $data['username'],
+                                true
+                            );
 			        		$this->session->set_flashdata('success', 'Successfully updated');
 			        		redirect('users/setting/', 'refresh');
 			        	}
 			        	else {
+                            // Log failed profile update with password change
+                            $this->logs->logActivity(
+                                'update',
+                                'Users',
+                                'Failed to update profile settings with password change for: ' . $data['username'],
+                                false
+                            );
 			        		$this->session->set_flashdata('errors', 'Error occurred!!');
 			        		redirect('users/setting/', 'refresh');
 			        	}

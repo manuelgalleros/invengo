@@ -15,6 +15,7 @@ class Orders extends Admin_Controller
 		$this->load->model('model_orders');
 		$this->load->model('model_products');
 		$this->load->model('model_company');
+		$this->load->helper('activity');
 	}
 
 	/* 
@@ -197,11 +198,20 @@ class Orders extends Admin_Controller
         	$order_id = $this->model_orders->create();
         	
         	if($order_id) {
+                // Get the order details for logging and response
+                $order_data = $this->model_orders->getOrdersData($order_id);
+                
+                // Log successful order creation with consistently formatted order number
+                log_activity(
+                    'create',
+                    'Orders',
+                    'Created new order #' . $order_data['order_no'],
+                    true
+                );
+                
                 // Check if this is an AJAX request
                 if($this->input->is_ajax_request()) {
-                    // Get the order details to include in the response
-                    $order_data = $this->model_orders->getOrdersData($order_id);
-                    
+                    // Response already has order data
                     $response = array(
                         'success' => true,
                         'message' => 'Order successfully created',
@@ -218,6 +228,19 @@ class Orders extends Admin_Controller
         		redirect('orders/update/'.$order_id, 'refresh');
         	}
         	else {
+                // Get any available information about the attempted order
+                $attempted_info = "";
+                if ($this->input->post('customer_name')) {
+                    $attempted_info = " for customer " . $this->input->post('customer_name');
+                }
+
+                log_activity(
+                    'create',
+                    'Orders',
+                    'Failed to create new order' . $attempted_info,
+                    false
+                );
+                
                 // Check if this is an AJAX request
                 if($this->input->is_ajax_request()) {
                     $response = array(
@@ -424,10 +447,33 @@ class Orders extends Admin_Controller
         	$update = $this->model_orders->update($id);
         	
         	if($update == true) {
+                // Get order data for logging
+                $order_data = $this->model_orders->getOrdersData($id);
+                
+                // Log successful order update
+                log_activity(
+                    'update',
+                    'Orders',
+                    'Updated order #' . $order_data['order_no'],
+                    true
+                );
+                
         		$this->session->set_flashdata('success', 'Successfully updated');
         		redirect('orders/update/'.$id, 'refresh');
         	}
         	else {
+                // Get order data for logging if available
+                $order_data = $this->model_orders->getOrdersData($id);
+                $order_identifier = isset($order_data['order_no']) ? $order_data['order_no'] : $id;
+                
+                // Log failed order update
+                log_activity(
+                    'update',
+                    'Orders',
+                    'Failed to update order #' . $order_identifier,
+                    false
+                );
+                
         		$this->session->set_flashdata('errors', 'Error occurred!!');
         		redirect('orders/update/'.$id, 'refresh');
         	}
@@ -453,6 +499,9 @@ class Orders extends Admin_Controller
 
         	$this->data['products'] = $this->model_products->getActiveProductData();      	
 
+            $user_id = $this->session->userdata('id');
+            $this->data['user_data'] = $this->model_users->getUserData($user_id);
+
             $this->render_template('orders/edit', $this->data);
         }
 	}
@@ -467,64 +516,311 @@ class Orders extends Admin_Controller
             redirect('dashboard', 'refresh');
         }
 
-		$order_id = $this->input->post('order_id');
-
+        $order_id = $this->input->post('order_id');
+        
         if($order_id) {
-			$order_data = $this->model_orders->getOrdersData($order_id);
-			if ($order_data) {
-				// Get order number for all orders to be deleted for better feedback
-				$order_numbers = [];
-				if (is_array($order_id)) {
-					foreach ($order_id as $id) {
-						$order = $this->model_orders->getOrdersData($id);
-						if ($order) {
-							$order_numbers[] = $order['order_no'];
-						}
-					}
-				} else {
-					$order_numbers[] = $order_data['order_no'];
-				}
-				
-				// Process deletion
-				$delete = $this->model_orders->remove($order_id);
-				if($delete == true) {
-					$response = [
-						'success' => true,
-						'messages' => 'Successfully removed'
-					];
-					
-					// Add specific information for better user feedback
-					if (count($order_numbers) === 1) {
-						$response['order_no'] = $order_numbers[0];
-					} else {
-						$response['order_count'] = count($order_numbers);
-					}
-				}
-				else {
-					$response = [
-						'success' => false,
-						'messages' => 'Error in the database while removing the product information'
-					];
-				}
-			} else {
-				$response = [
-					'success' => false, 
-					'messages' => 'Order not found'
-				];
-			}
+            // Get order data before deletion for logging
+            $order_data = $this->model_orders->getOrdersData($order_id);
+            
+            // Check if order data exists
+            if(!$order_data) {
+                $response['success'] = false;
+                $response['messages'] = "Order not found. It may have been deleted.";
+                log_message('error', 'Delete failed: Order ID ' . $order_id . ' not found');
+                echo json_encode($response);
+                return;
+            }
+            
+            // Debug log the order data for troubleshooting
+            error_log('ORDER DATA for deletion: ' . json_encode($order_data));
+            $order_no = isset($order_data['order_no']) ? $order_data['order_no'] : '[unknown]';
+            
+            $delete = $this->model_orders->remove($order_id);
+            if($delete == true) {
+                // Log successful order deletion with explicit order number
+                error_log("Successfully deleted order " . $order_no);
+                
+                // Make sure we're including the order number in the log description
+                $log_description = "Deleted order " . $order_no;
+                log_activity(
+                    'delete',
+                    'Orders',
+                    $log_description,
+                    true
+                );
+                
+                $response['success'] = true;
+                $response['messages'] = "Successfully removed";
+                $response['order_no'] = $order_no;
+                
+                log_message('debug', 'Deleted order: ' . $order_no);
+            }
+            else {
+                // Log failed order deletion
+                error_log("Failed to delete order " . $order_no);
+                log_activity(
+                    'delete',
+                    'Orders',
+                    'Failed to delete order ' . $order_no,
+                    false
+                );
+                
+                $response['success'] = false;
+                $response['messages'] = "Error in the database while removing the order";
+                log_message('error', 'Delete failed with database error: ' . $this->db->error()['message']);
+            }
         }
         else {
-            $response = [
-				'success' => false, 
-				'messages' => 'Refersh the page and try again'
-			];
+            $response['success'] = false;
+            $response['messages'] = "Please refresh the page again!!";
         }
 
         echo json_encode($response);
 	}
 
+	/*
+	* Archives the order
+	*/
+	public function archive()
+	{
+		// Check for proper permissions
+		if(!in_array('deleteOrder', $this->permission)) {
+			redirect('dashboard', 'refresh');
+		}
+		
+		// Log that archive method was called
+		error_log("ARCHIVE METHOD CALLED");
 
-		/*
+		// Handle AJAX request
+		if ($this->input->is_ajax_request()) {
+			$order_id = $this->input->post('order_id');
+			error_log("Order ID received: " . (is_array($order_id) ? json_encode($order_id) : $order_id));
+			
+			if($order_id) {
+				// Handle different types of order_id input (array or single value)
+				if(is_array($order_id)) {
+					// Multiple orders case
+					$archive = $this->model_orders->archive($order_id);
+					if($archive === true) {
+						// Log successful archival of multiple orders
+						error_log("Archiving multiple orders: " . count($order_id) . " orders");
+						log_activity(
+							'archive',
+							'Orders',
+							'Archived ' . count($order_id) . ' orders',
+							true
+						);
+						
+						$response['success'] = true;
+						$response['messages'] = "Successfully archived";
+						$response['order_count'] = count($order_id);
+						log_message('debug', 'Archived ' . count($order_id) . ' orders');
+					}
+					else if($archive === false) {
+						// Log failed archival
+						error_log("Failed to archive multiple orders: Column missing");
+						log_activity(
+							'archive',
+							'Orders',
+							'Failed to archive ' . count($order_id) . ' orders',
+							false
+						);
+						
+						$response['success'] = false;
+						$response['messages'] = "Archive feature not available (is_archived column missing)";
+						log_message('error', 'Archive failed: is_archived column is missing in orders table');
+					}
+					else {
+						$response['success'] = false;
+						$response['messages'] = "Error in the database while archiving the orders";
+						log_message('error', 'Archive failed with unknown error: ' . $this->db->error()['message']);
+					}
+				} else {
+					// Single order case
+					// Get order data before archiving for logging
+					$order_data = $this->model_orders->getOrdersData($order_id);
+					if (!$order_data) {
+						$response['success'] = false;
+						$response['messages'] = "Order not found. It may have been deleted.";
+						log_message('error', 'Archive failed: Order ID ' . $order_id . ' not found');
+						echo json_encode($response);
+						return;
+					}
+					
+					// Debug log the order data for troubleshooting
+					error_log('ORDER DATA for archiving: ' . json_encode($order_data));
+					$order_no = isset($order_data['order_no']) ? $order_data['order_no'] : '[unknown]';
+					
+					$archive = $this->model_orders->archive($order_id);
+					if ($archive === true) {
+						// Log successful order archival with explicit order number
+						error_log("Successfully archived order " . $order_no);
+						
+						// Make sure we're including the order number in the log description
+						$log_description = "Archived order " . $order_no;
+						log_activity(
+							'archive',
+							'Orders',
+							$log_description,
+							true
+						);
+						
+						$response['success'] = true;
+						$response['messages'] = "Successfully archived";
+						$response['order_no'] = $order_no;
+						log_message('debug', 'Archived order: ' . $order_no);
+					}
+					else if($archive === false) {
+						// Log failed order archival
+						error_log("Failed to archive single order " . $order_no . ": Column missing");
+						log_activity(
+							'archive',
+							'Orders',
+							'Failed to archive order ' . $order_no,
+							false
+						);
+						
+						$response['success'] = false;
+						$response['messages'] = "Archive feature not available (is_archived column missing)";
+						log_message('error', 'Archive failed: is_archived column is missing in orders table');
+					}
+					else {
+						$response['success'] = false;
+						$response['messages'] = "Error in the database while archiving the order";
+						log_message('error', 'Archive failed with unknown error: ' . $this->db->error()['message']);
+					}
+				}
+			}
+			else {
+				$response['success'] = false;
+				$response['messages'] = "Please refresh the page again!!";
+				log_message('error', 'Archive failed: No order ID provided');
+			}
+
+			echo json_encode($response);
+			return;
+		}
+		
+		// For GET requests, load the archived orders view
+		$user_id = $this->session->userdata('id');
+		$this->data['user_data'] = $this->model_users->getUserData($user_id);
+		$this->data['page_title'] = 'Archived Orders';
+		$this->render_template('orders/archive', $this->data);
+	}
+
+	public function restore()
+	{
+		if(!in_array('updateOrder', $this->permission)) {
+            redirect('dashboard', 'refresh');
+        }
+
+        $order_id = $this->input->post('order_id');
+        
+        if($order_id) {
+            // Handle both single ID and array of IDs for restoration
+            if(is_array($order_id)) {
+                // For multiple orders
+                $restore = $this->model_orders->restore($order_id);
+                if($restore === true) {
+                    // Log successful restoration of multiple orders
+                    log_activity(
+                        'restore',
+                        'Orders',
+                        'Restored ' . count($order_id) . ' orders',
+                        true
+                    );
+                    
+                    $response['success'] = true;
+                    $response['messages'] = "Successfully restored";
+                    $response['order_count'] = count($order_id);
+                    
+                    log_message('debug', 'Restored ' . count($order_id) . ' orders');
+                }
+                else if($restore === false) {
+                    // Log failed restoration
+                    log_activity(
+                        'restore',
+                        'Orders',
+                        'Failed to restore ' . count($order_id) . ' orders',
+                        false
+                    );
+                    
+                    $response['success'] = false;
+                    $response['messages'] = "Restore feature not available (is_archived column missing)";
+                    log_message('error', 'Restore failed: is_archived column is missing in orders table');
+                }
+                else {
+                    $response['success'] = false;
+                    $response['messages'] = "Error in the database while restoring the orders";
+                    log_message('error', 'Restore failed with unknown error: ' . $this->db->error()['message']);
+                }
+            } else {
+                // Single order case - get order data before restoration for logging
+                $order_data = $this->model_orders->getOrdersData($order_id);
+                
+                // Check if order data exists
+                if(!$order_data) {
+                    $response['success'] = false;
+                    $response['messages'] = "Order not found. It may have been deleted.";
+                    log_message('error', 'Restore failed: Order ID ' . $order_id . ' not found');
+                    echo json_encode($response);
+                    return;
+                }
+                
+                // Debug log the order data for troubleshooting
+                error_log('ORDER DATA for restoring: ' . json_encode($order_data));
+                $order_no = isset($order_data['order_no']) ? $order_data['order_no'] : '[unknown]';
+                
+                $restore = $this->model_orders->restore($order_id);
+                if($restore === true) {
+                    // Log successful order restoration with explicit order number
+                    error_log("Successfully restored order " . $order_no);
+                    
+                    // Make sure we're including the order number in the log description
+                    $log_description = "Restored order " . $order_no;
+                    log_activity(
+                        'restore',
+                        'Orders',
+                        $log_description,
+                        true
+                    );
+                    
+                    $response['success'] = true;
+                    $response['messages'] = "Successfully restored";
+                    $response['order_no'] = $order_no;
+                    
+                    log_message('debug', 'Restored order: ' . $order_no);
+                }
+                else if($restore === false) {
+                    // Log failed order restoration
+                    log_activity(
+                        'restore',
+                        'Orders',
+                        'Failed to restore order ' . $order_no,
+                        false
+                    );
+                    
+                    $response['success'] = false;
+                    $response['messages'] = "Restore feature not available (is_archived column missing)";
+                    log_message('error', 'Restore failed: is_archived column is missing in orders table');
+                }
+                else {
+                    $response['success'] = false;
+                    $response['messages'] = "Error in the database while restoring the order";
+                    log_message('error', 'Restore failed with unknown error: ' . $this->db->error()['message']);
+                }
+            }
+        }
+        else {
+            $response['success'] = false;
+            $response['messages'] = "Please refresh the page again!!";
+            log_message('error', 'Restore failed: No order ID provided');
+        }
+
+        echo json_encode($response);
+	}
+
+	/*
 	* It gets the product id and fetch the order data. 
 	* The order print logic is done here 
 	*/
@@ -818,259 +1114,153 @@ class Orders extends Admin_Controller
 	}
 
 	/*
-	* It archives the order by setting the is_archived flag to 1
-	* and returns the response in json format
+	* Fetches the archived orders data from the orders table
+	* this function is called from the datatable ajax function
 	*/
-	public function archive()
+	public function fetchArchivedOrdersData()
 	{
-		// Permission check
-		if(!in_array('updateOrder', $this->permission)) {
-            redirect('dashboard', 'refresh');
-		}
+		$page = $this->input->get('page') ? $this->input->get('page') : 1;
+		$per_page = 10;
+		$search = $this->input->get('search') ? $this->input->get('search') : '';
 
-		$order_id = $this->input->post('order_id');
-		$response = array('success' => false, 'messages' => array());
-
-		if ($_SERVER['REQUEST_METHOD'] == 'GET') {
-			$this->data['page_title'] = 'Archived Orders';
-			$user_id = $this->session->userdata('id');
-			$this->data['user_data'] = $this->model_users->getUserData($user_id);
-			$this->render_template('orders/archive', $this->data); 
+		// Check if is_archived column exists before using it
+		$this->db->query("SHOW COLUMNS FROM orders LIKE 'is_archived'");
+		$is_archived_exists = $this->db->affected_rows() > 0;
+		
+		// If column doesn't exist, display a user-friendly message
+		if (!$is_archived_exists) {
+			$result = array(
+				'data' => array(),
+				'pagination' => '',
+				'range_info' => 'Archive feature not available. Please run the migration to add required columns.',
+				'error' => true,
+				'message' => 'is_archived column is missing from the orders table. Please run the migration.'
+			);
+			echo json_encode($result);
 			return;
 		}
 
-		if($order_id) {
-			$archive = $this->model_orders->archive($order_id);
-			if($archive === false) {
-				$response['messages'] = 'Archive feature not available (is_archived column missing)';
-				log_message('error', 'Archive failed: is_archived column is missing in orders table');
-			}
-			else if($archive === true) {
-				$response['success'] = true;
-				$response['messages'] = 'Successfully archived';
-				
-				// Add additional info for UI feedback
-				if (is_array($order_id)) {
-					$response['order_count'] = count($order_id);
-					log_message('debug', 'Archived ' . count($order_id) . ' orders');
-				} else {
-					$order_data = $this->model_orders->getOrdersData($order_id);
-					if ($order_data) {
-						$response['order_no'] = $order_data['order_no'];
-						log_message('debug', 'Archived order: ' . $order_data['order_no']);
-					}
-				}
-			}
-			else {
-				$response['messages'] = 'Database error occurred during archive operation';
-				log_message('error', 'Archive failed with unknown error: ' . $this->db->error()['message']);
-			}
-		}
-		else {
-			$response['messages'] = 'No order ID provided for archive operation';
-			log_message('error', 'Archive failed: No order ID provided');
+		// Get archived orders with pagination
+		$this->db->select('orders.*, users.firstname, users.lastname, archivers.firstname as archiver_firstname, archivers.lastname as archiver_lastname');
+		$this->db->from('orders');
+		$this->db->join('users', 'users.id = orders.user_id', 'left');
+		$this->db->join('users as archivers', 'archivers.id = orders.archived_by', 'left');
+		$this->db->where('orders.is_archived', 1); // Only get archived orders
+		
+		if(!empty($search)) {
+			$this->db->group_start();
+			$this->db->like('orders.order_no', $search);
+			$this->db->or_like('users.firstname', $search);
+			$this->db->or_like('users.lastname', $search);
+			$this->db->or_like('orders.payment_method', $search);
+			$this->db->group_end();
 		}
 
-		echo json_encode($response);
-	}
-    
-    
-    /*
-    * Fetches the archived orders data from the orders table
-    * this function is called from the datatable ajax function
-    */
-    public function fetchArchivedOrdersData()
-    {
-        $page = $this->input->get('page') ? $this->input->get('page') : 1;
-        $per_page = 10;
-        $search = $this->input->get('search') ? $this->input->get('search') : '';
+		// Count total rows for pagination
+		$total_rows = $this->db->count_all_results('', false);
+		$total_pages = ceil($total_rows / $per_page);
 
-        // Check if is_archived column exists before using it
-        $this->db->query("SHOW COLUMNS FROM orders LIKE 'is_archived'");
-        $is_archived_exists = $this->db->affected_rows() > 0;
-        
-        // If column doesn't exist, display a user-friendly message
-        if (!$is_archived_exists) {
-            $result = array(
-                'data' => array(),
-                'pagination' => '',
-                'range_info' => 'Archive feature not available. Please run the migration to add required columns.',
-                'error' => true,
-                'message' => 'is_archived column is missing from the orders table. Please run the migration.'
-            );
-            echo json_encode($result);
-            return;
-        }
+		// Get paginated results
+		$this->db->limit($per_page, ($page - 1) * $per_page);
+		$this->db->order_by('orders.id', 'DESC');
+		$query = $this->db->get();
+		$orders = $query->result_array();
 
-        // Get archived orders with pagination
-        $this->db->select('orders.*, users.firstname, users.lastname, archivers.firstname as archiver_firstname, archivers.lastname as archiver_lastname');
-        $this->db->from('orders');
-        $this->db->join('users', 'users.id = orders.user_id', 'left');
-        $this->db->join('users as archivers', 'archivers.id = orders.archived_by', 'left');
-        $this->db->where('orders.is_archived', 1); // Only get archived orders
-        
-        if(!empty($search)) {
-            $this->db->group_start();
-            $this->db->like('orders.order_no', $search);
-            $this->db->or_like('users.firstname', $search);
-            $this->db->or_like('users.lastname', $search);
-            $this->db->or_like('orders.payment_method', $search);
-            $this->db->group_end();
-        }
+		$data = array();
+		foreach ($orders as $order) {
+			$count_total_item = $this->model_orders->countOrderItem($order['id']);
+			// Format date using Philippine Standard Time
+			$date_time = $this->formatPhilippineDateTime($order['date_time']);
+			
+			// Create a user name from firstname and lastname
+			$user_name = '';
+			if(!empty($order['firstname']) || !empty($order['lastname'])) {
+				$user_name = $order['firstname'] . ' ' . $order['lastname'];
+			}
 
-        // Count total rows for pagination
-        $total_rows = $this->db->count_all_results('', false);
-        $total_pages = ceil($total_rows / $per_page);
-
-        // Get paginated results
-        $this->db->limit($per_page, ($page - 1) * $per_page);
-        $this->db->order_by('orders.id', 'DESC');
-        $query = $this->db->get();
-        $orders = $query->result_array();
-
-        $data = array();
-        foreach ($orders as $order) {
-            $count_total_item = $this->model_orders->countOrderItem($order['id']);
-            // Format date using Philippine Standard Time
-            $date_time = $this->formatPhilippineDateTime($order['date_time']);
-            
-            // Create a user name from firstname and lastname
-            $user_name = '';
-            if(!empty($order['firstname']) || !empty($order['lastname'])) {
-                $user_name = $order['firstname'] . ' ' . $order['lastname'];
-            }
-
-            $data[] = array(
-                'id' => $order['id'],
-                'order_no' => $order['order_no'],
-                'date_time' => $date_time,
-                'total_products' => $count_total_item,
-                'net_amount' => $order['net_amount'],
-                'payment_method' => $order['payment_method'] ? ucfirst(strtolower($order['payment_method'])) : '',
-                'user_name' => $user_name,
-                'paid_status' => $order['paid_status'],
-                'archived_at' => $order['archived_at'] ? $this->formatPhilippineDateTime($order['archived_at']) : 'N/A',
-                'archived_by' => (!empty($order['archiver_firstname']) || !empty($order['archiver_lastname'])) 
-                    ? $order['archiver_firstname'] . ' ' . $order['archiver_lastname']
-                    : 'N/A'
-            );
-        }
-
-        // Calculate range info
-        $start = ($page - 1) * $per_page + 1;
-        $end = min($start + $per_page - 1, $total_rows);
-        $range_info = "Showing $start to $end of $total_rows archived orders";
-
-        // Generate pagination HTML
-        $pagination = '';
-        
-        // First page button
-        $first_disabled = ($page <= 1) ? 'disabled' : '';
-        $pagination .= '<li class="page-item ' . $first_disabled . '">
-                            <a href="#" class="page-link" data-page="1">
-                                <i class="ti ti-chevrons-left"></i>
-                            </a>
-                        </li>';
-        
-        // Previous button
-        $prev_disabled = ($page <= 1) ? 'disabled' : '';
-        $pagination .= '<li class="page-item ' . $prev_disabled . '">
-                            <a href="#" class="page-link" data-page="' . ($page - 1) . '">
-                                Previous
-                            </a>
-                        </li>';
-
-        // Page numbers - show only up to 5 pages
-        $startPage = max(1, $page - 2);
-        $endPage = min($total_pages, $page + 2);
-
-        // Adjust for edge cases
-        if ($page <= 3) {
-            $endPage = min(5, $total_pages);
-        }
-        if ($page > $total_pages - 2) {
-            $startPage = max($total_pages - 4, 1);
-        }
-
-        // Generate page number links
-        for ($i = $startPage; $i <= $endPage; $i++) {
-            $active = ($i == $page) ? 'active' : '';
-            $pagination .= '<li class="page-item ' . $active . '">
-                            <a href="#" class="page-link" data-page="' . $i . '">' . $i . '</a>
-                        </li>';
-        }
-
-        // Next button
-        $next_disabled = ($page >= $total_pages) ? 'disabled' : '';
-        $pagination .= '<li class="page-item ' . $next_disabled . '">
-                            <a href="#" class="page-link" data-page="' . ($page + 1) . '">
-                                Next
-                            </a>
-                        </li>';
-        
-        // Last page button
-        $last_disabled = ($page >= $total_pages) ? 'disabled' : '';
-        $pagination .= '<li class="page-item ' . $last_disabled . '">
-                            <a href="#" class="page-link" data-page="' . $total_pages . '">
-                                <i class="ti ti-chevrons-right"></i>
-                            </a>
-                        </li>';
-
-        $result = array(
-            'data' => $data,
-            'pagination' => $pagination,
-            'range_info' => $range_info
-        );
-
-        echo json_encode($result);
-    }
-    
-    /*
-    * Restore the archived order
-    */
-	public function restore()
-	{
-		// Permission check
-		if(!in_array('updateOrder', $this->permission)) {
-			redirect('dashboard', 'refresh');
+			$data[] = array(
+				'id' => $order['id'],
+				'order_no' => $order['order_no'],
+				'date_time' => $date_time,
+				'total_products' => $count_total_item,
+				'net_amount' => $order['net_amount'],
+				'payment_method' => $order['payment_method'] ? ucfirst(strtolower($order['payment_method'])) : '',
+				'user_name' => $user_name,
+				'paid_status' => $order['paid_status'],
+				'archived_at' => $order['archived_at'] ? $this->formatPhilippineDateTime($order['archived_at']) : 'N/A',
+				'archived_by' => (!empty($order['archiver_firstname']) || !empty($order['archiver_lastname'])) 
+					? $order['archiver_firstname'] . ' ' . $order['archiver_lastname']
+					: 'N/A'
+			);
 		}
 
-		$order_id = $this->input->post('order_id');
-		$response = array('success' => false, 'messages' => array());
+		// Calculate range info
+		$start = ($page - 1) * $per_page + 1;
+		$end = min($start + $per_page - 1, $total_rows);
+		$range_info = "Showing $start to $end of $total_rows archived orders";
 
-		if($order_id) {
-			$restore = $this->model_orders->restore($order_id);
-			if($restore === false) {
-				$response['messages'] = 'Restore feature not available (is_archived column missing)';
-				log_message('error', 'Restore failed: is_archived column is missing in orders table');
-			}
-			else if($restore === true) {
-				$response['success'] = true;
-				$response['messages'] = 'Successfully restored';
-				
-				// Add additional info for UI feedback
-				if (is_array($order_id)) {
-					$response['order_count'] = count($order_id);
-					log_message('debug', 'Restored ' . count($order_id) . ' orders');
-				} else {
-					$order_data = $this->model_orders->getOrdersData($order_id);
-					if ($order_data) {
-						$response['order_no'] = $order_data['order_no'];
-						log_message('debug', 'Restored order: ' . $order_data['order_no']);
-					}
-				}
-			}
-			else {
-				$response['messages'] = 'Database error occurred during restore operation';
-				log_message('error', 'Restore failed with unknown error: ' . $this->db->error()['message']);
-			}
+		// Generate pagination HTML
+		$pagination = '';
+		
+		// First page button
+		$first_disabled = ($page <= 1) ? 'disabled' : '';
+		$pagination .= '<li class="page-item ' . $first_disabled . '">
+							<a href="#" class="page-link" data-page="1">
+								<i class="ti ti-chevrons-left"></i>
+							</a>
+						</li>';
+		
+		// Previous button
+		$prev_disabled = ($page <= 1) ? 'disabled' : '';
+		$pagination .= '<li class="page-item ' . $prev_disabled . '">
+							<a href="#" class="page-link" data-page="' . ($page - 1) . '">
+								Previous
+							</a>
+						</li>';
+
+		// Page numbers - show only up to 5 pages
+		$startPage = max(1, $page - 2);
+		$endPage = min($total_pages, $page + 2);
+
+		// Adjust for edge cases
+		if ($page <= 3) {
+			$endPage = min(5, $total_pages);
 		}
-		else {
-			$response['messages'] = 'No order ID provided for restore operation';
-			log_message('error', 'Restore failed: No order ID provided');
+		if ($page > $total_pages - 2) {
+			$startPage = max($total_pages - 4, 1);
 		}
 
-		echo json_encode($response);
+		// Generate page number links
+		for ($i = $startPage; $i <= $endPage; $i++) {
+			$active = ($i == $page) ? 'active' : '';
+			$pagination .= '<li class="page-item ' . $active . '">
+							<a href="#" class="page-link" data-page="' . $i . '">' . $i . '</a>
+						</li>';
+		}
+
+		// Next button
+		$next_disabled = ($page >= $total_pages) ? 'disabled' : '';
+		$pagination .= '<li class="page-item ' . $next_disabled . '">
+							<a href="#" class="page-link" data-page="' . ($page + 1) . '">
+								Next
+							</a>
+						</li>';
+		
+		// Last page button
+		$last_disabled = ($page >= $total_pages) ? 'disabled' : '';
+		$pagination .= '<li class="page-item ' . $last_disabled . '">
+							<a href="#" class="page-link" data-page="' . $total_pages . '">
+								<i class="ti ti-chevrons-right"></i>
+							</a>
+						</li>';
+
+		$result = array(
+			'data' => $data,
+			'pagination' => $pagination,
+			'range_info' => $range_info
+		);
+
+		echo json_encode($result);
 	}
 
 	/*
