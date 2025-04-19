@@ -195,6 +195,30 @@ class Model_orders extends CI_Model
 		return $query->num_rows();
 	}
 
+	/**
+	 * Calculate today's total earnings from paid orders
+	 * 
+	 * @return float Total earnings for today
+	 */
+	public function getTodaysEarnings()
+	{
+		// Get start and end timestamps for today
+		$today_start = strtotime(date('Y-m-d') . ' 00:00:00');
+		$today_end = strtotime(date('Y-m-d') . ' 23:59:59');
+		
+		// Query to sum net_amount for today's paid orders
+		$sql = "SELECT SUM(net_amount) as total_earnings 
+				FROM orders 
+				WHERE paid_status = ? 
+				AND date_time BETWEEN ? AND ?";
+				
+		$query = $this->db->query($sql, array(1, $today_start, $today_end));
+		$result = $query->row_array();
+		
+		// Return 0 if no earnings found
+		return ($result['total_earnings']) ? $result['total_earnings'] : 0;
+	}
+
 	/*
 	* Archive an order by setting is_archived to 1
 	*/

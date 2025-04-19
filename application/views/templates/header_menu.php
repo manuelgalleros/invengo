@@ -219,13 +219,13 @@
                                 <!-- item-->
                                 <a href="<?php echo base_url('users/profile') ?>" class="dropdown-item">
                                     <i class="ti ti-user-hexagon me-1 fs-17 align-middle"></i>
-                                    <span class="align-middle">My Account</span>
+                                    <span class="align-middle">View Profile</span>
                                 </a>
 
                                 <!-- item-->
                                 <a href="<?php echo base_url('users/setting') ?>" class="dropdown-item">
                                     <i class="ti ti-settings me-1 fs-17 align-middle"></i>
-                                    <span class="align-middle">Settings</span>
+                                    <span class="align-middle">Account Settings</span>
                                 </a>
 
                                 <div class="dropdown-divider"></div>
@@ -252,9 +252,9 @@ $(document).ready(function() {
 
         // Handle specific actions based on the clicked item
         var action = $(this).text().trim();
-        if (action === 'My Account') {
+        if (action === 'View Profile') {
             window.location.href = "<?php echo base_url('users/profile'); ?>";
-        } else if (action === 'Settings') {
+        } else if (action === 'Account Settings') {
             window.location.href = "<?php echo base_url('users/setting'); ?>";
         } else if (action === 'Log Out') {
             window.location.href = "<?php echo base_url('auth/logout'); ?>";

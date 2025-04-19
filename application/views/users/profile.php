@@ -20,7 +20,7 @@
               <img src="<?php echo base_url('assets/images/users/'.$user_data['profile_image']); ?>" 
                    alt="Profile Image" 
                    class="rounded-circle img-thumbnail"
-                   style="width: 120px; height: 120px; object-fit: cover;">
+                   style="width: 160px; height: 160px; object-fit: cover;">
             <?php else: ?>
               <div class="avatar-lg mx-auto">
                 <div class="avatar-title bg-info-subtle text-info rounded-circle fs-24">

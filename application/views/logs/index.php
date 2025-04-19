@@ -72,6 +72,10 @@
 
 <script>
 $(document).ready(function() {
+    // Auto-refresh timer
+    let refreshInterval;
+    const REFRESH_INTERVAL = 1000; // Refresh every 10 seconds
+    
     // Only hide the table body and footer initially
     
     // Show logs button click handler
@@ -80,6 +84,9 @@ $(document).ready(function() {
         loadLogs();
         // Hide the Show Logs button after showing the table
         $(this).hide();
+        
+        // Start the auto-refresh timer
+        startAutoRefresh();
     });
     
     // Initialize flatpickr date picker
@@ -103,10 +110,45 @@ $(document).ready(function() {
         }, 500);
     });
     
+    // Start auto-refresh functionality
+    function startAutoRefresh() {
+        // Clear any existing intervals
+        if (refreshInterval) {
+            clearInterval(refreshInterval);
+        }
+        
+        // Set up new interval
+        refreshInterval = setInterval(function() {
+            const currentPage = $('#logsFooter .pagination .active a').data('page') || 1;
+            loadLogs(currentPage, true);
+        }, REFRESH_INTERVAL);
+        
+        // Add visual indicator that auto-refresh is active - REMOVED
+        // Instead, just add the necessary CSS for highlighting new logs
+        if (!$('#highlightNewCSS').length) {
+            $("<style id='highlightNewCSS'>")
+              .prop("type", "text/css")
+              .html(`
+                @keyframes highlightFade {
+                  from { background-color: rgba(255, 243, 205, 0.8); }
+                  to { background-color: transparent; }
+                }
+                .highlight-new {
+                  animation: highlightFade 4s ease-out;
+                }
+              `)
+              .appendTo("head");
+        }
+    }
+    
     // Function to load logs with pagination
-    function loadLogs(page = 1) {
+    function loadLogs(page = 1, isAutoRefresh = false) {
         var searchQuery = $('#searchBox').val();
         var dateRange = $('#dateRangePicker').val();
+        var currentScrollPosition = $(window).scrollTop();
+        
+        // Keep track of the latest log ID to detect new entries
+        var latestLogId = $('#logsBody tr:first-child td:first-child').text() || 0;
         
         $.ajax({
             url: '<?php echo base_url('logs/fetchLogs') ?>',
@@ -136,11 +178,22 @@ $(document).ready(function() {
                 // Show the table body and footer
                 $("#logsBody tr, #logsFooter").fadeIn();
                 
+                // Check if there are new logs
+                var newLogsExist = false;
+                if (logs.length > 0 && isAutoRefresh) {
+                    // Convert latest log ID to integer for comparison
+                    latestLogId = parseInt(latestLogId);
+                    newLogsExist = parseInt(logs[0].id) > latestLogId;
+                }
+                
                 // Update logs table
                 var html = '';
                 if (logs.length > 0) {
                     for (var i = 0; i < logs.length; i++) {
-                        html += '<tr>';
+                        // Only highlight new entries if we're auto-refreshing AND 
+                        // there are actually new logs AND this log is newer than our last known
+                        var isNewLog = isAutoRefresh && newLogsExist && parseInt(logs[i].id) > latestLogId;
+                        html += '<tr' + (isNewLog ? ' class="highlight-new"' : '') + '>';
                         html += '<td class="text-center">' + logs[i].id + '</td>';
                         html += '<td>' + logs[i].user + '</td>';
                         html += '<td><span class="badge bg-' + getActionBadgeClass(logs[i].action) + '">' + logs[i].action + '</span></td>';
@@ -151,6 +204,23 @@ $(document).ready(function() {
                 } else {
                     html = '<tr><td colspan="6" class="text-center">No logs found</td></tr>';
                 }
+                
+                // Add highlight CSS if it doesn't exist yet
+                if (!$('#highlightNewCSS').length) {
+                    $("<style id='highlightNewCSS'>")
+                      .prop("type", "text/css")
+                      .html(`
+                        @keyframes highlightFade {
+                          from { background-color: rgba(255, 243, 205, 0.8); }
+                          to { background-color: transparent; }
+                        }
+                        .highlight-new {
+                          animation: highlightFade 4s ease-out;
+                        }
+                      `)
+                      .appendTo("head");
+                }
+                
                 $('#logsBody').html(html);
                 
                 // Update pagination
@@ -161,6 +231,11 @@ $(document).ready(function() {
                 var end = Math.min(start + 9, response.totalRecords);
                 var rangeHtml = '<div>Showing ' + start + ' to ' + end + ' of ' + response.totalRecords + ' logs</div>';
                 $('#logsFooter .text-muted').html(rangeHtml);
+                
+                // Only restore scroll position if it's an auto-refresh
+                if (isAutoRefresh) {
+                    $(window).scrollTop(currentScrollPosition);
+                }
             },
             error: function() {
                 $('#logsBody').html('<tr><td colspan="6" class="text-center text-danger">Error loading logs</td></tr>');
@@ -244,5 +319,12 @@ $(document).ready(function() {
             }
         });
     }
+    
+    // Clean up interval when leaving page
+    $(window).on('beforeunload', function() {
+        if (refreshInterval) {
+            clearInterval(refreshInterval);
+        }
+    });
 });
 </script>
