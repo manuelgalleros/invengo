@@ -87,17 +87,39 @@ class Model_brands extends CI_Model
 		}
 	}
 
+	/**
+	* Remove the brand data
+	* @param int $id 
+	* @return boolean
+	*/
 	public function remove($id)
 	{
 		if($id) {
-			// Check if $id is an array for multiple deletion
-			if(is_array($id)) {
-				$this->db->where_in('id', $id);
-			} else {
+			try {
 				$this->db->where('id', $id);
+				$result = $this->db->delete('brands');
+				
+				// Check if there was a database error
+				if ($this->db->error()['code']) {
+					$error_message = $this->db->error()['message'];
+					
+					// Check if it's a foreign key constraint violation
+					if (strpos($error_message, 'foreign key constraint fails') !== false) {
+						throw new Exception('Cannot delete brand with ID ' . $id . ' because it has products assigned to it.');
+					}
+					
+					// For other database errors
+					throw new Exception('Database error: ' . $error_message);
+				}
+				
+				return ($result === true) ? true : false;
+			} catch (Exception $e) {
+				// Log the error
+				log_message('error', 'Brand deletion error: ' . $e->getMessage());
+				
+				// Re-throw the exception to be caught by the controller
+				throw $e;
 			}
-			$delete = $this->db->delete('brands');
-			return ($delete == true) ? true : false;
 		}
 	}
 

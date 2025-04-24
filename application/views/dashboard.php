@@ -15,11 +15,11 @@
                 <div class="row">
                     <div class="col">
                         <div class="row row-cols-xl-4 row-cols-md-2 row-cols-1 text-center">
-                            <div class="col">
-                                <div class="card">
-                                    <div class="card-body">
-                                        <h5 class="text-muted fs-13 text-uppercase" title="Number of Orders">Total No. of Products</h5>
-                                        <div class="d-flex align-items-center justify-content-center gap-2 my-2 py-1">
+                            <div class="col mb-4">
+                                <div class="card h-100">
+                                    <div class="card-body d-flex flex-column">
+                                        <h5 class="text-muted fs-13 text-uppercase" title="Number of Products">Total No. of Products</h5>
+                                        <div class="d-flex align-items-center justify-content-center gap-2 my-2 py-1 flex-grow-1">
                                             <div class="user-img fs-42 flex-shrink-0">
                                                 <span class="avatar-title text-bg-primary rounded-circle fs-22">
                                                     <iconify-icon icon="solar:cart-3-bold-duotone"></iconify-icon>
@@ -27,18 +27,18 @@
                                             </div>
                                             <h3 class="mb-0 fw-bold"><?php echo $total_products ?></h3>
                                         </div>
-                                        <p class="mb-0 text-muted">
+                                        <p class="mb-0 text-muted mt-auto">
                                            <i class="ti ti-info-circle"></i> <a href="<?php echo base_url('products/') ?>" class="link-info text-decoration-underline link-offset-2 link-underline-opacity-25 link-underline-opacity-100-hover">View more</a>
                                         </p>
                                     </div>
                                 </div>
                             </div><!-- end col -->
 
-                            <div class="col">
-                                <div class="card">
-                                    <div class="card-body">
+                            <div class="col mb-4">
+                                <div class="card h-100">
+                                    <div class="card-body d-flex flex-column">
                                         <h5 class="text-muted fs-13 text-uppercase" title="Number of Orders">Total Paid Orders</h5>
-                                        <div class="d-flex align-items-center justify-content-center gap-2 my-2 py-1">
+                                        <div class="d-flex align-items-center justify-content-center gap-2 my-2 py-1 flex-grow-1">
                                             <div class="user-img fs-42 flex-shrink-0">
                                                 <span class="avatar-title text-bg-primary rounded-circle fs-22">
                                                     <iconify-icon icon="solar:bill-list-bold-duotone"></iconify-icon>
@@ -46,26 +46,7 @@
                                             </div>
                                             <h3 class="mb-0 fw-bold"><?php echo $total_paid_orders ?></h3>
                                         </div>
-                                        <p class="mb-0 text-muted">
-                                             <i class="ti ti-info-circle"></i> <a href="<?php echo base_url('orders/') ?>" class="link-info text-decoration-underline link-offset-2 link-underline-opacity-25 link-underline-opacity-100-hover">View more</a>
-                                        </p>
-                                    </div>
-                                </div>
-                            </div><!-- end col -->
-
-                            <div class="col">
-                                <div class="card">
-                                    <div class="card-body">
-                                        <h5 class="text-muted fs-13 text-uppercase" title="Number of Orders">Today's Earning</h5>
-                                        <div class="d-flex align-items-center justify-content-center gap-2 my-2 py-1">
-                                            <div class="user-img fs-42 flex-shrink-0">
-                                                <span class="avatar-title text-bg-primary rounded-circle fs-22">
-                                                    <iconify-icon icon="solar:wallet-money-bold-duotone"></iconify-icon>
-                                                </span>
-                                            </div>
-                                            <h3 class="mb-0 fw-bold">₱<?php echo number_format($todays_earnings, 2); ?> <small class="text-muted">PHP</small></h3>
-                                        </div>
-                                        <p class="mb-0 text-muted">
+                                        <p class="mb-0 text-muted mt-auto">
                                              <i class="ti ti-info-circle"></i> <a href="<?php echo base_url('orders/') ?>" class="link-info text-decoration-underline link-offset-2 link-underline-opacity-25 link-underline-opacity-100-hover">View more</a>
                                         </p>
                                     </div>
@@ -73,10 +54,29 @@
                             </div><!-- end col -->
 
                             <div class="col mb-4">
-                                <div class="card">
-                                    <div class="card-body">
-                                        <h5 class="text-muted fs-13 text-uppercase" title="Number of Orders">Number of Users</h5>
-                                        <div class="d-flex align-items-center justify-content-center gap-2 my-2 py-1">
+                                <div class="card h-100">
+                                    <div class="card-body d-flex flex-column">
+                                        <h5 class="text-muted fs-13 text-uppercase" title="Today's Earnings">Today's Earning</h5>
+                                        <div class="d-flex align-items-center justify-content-center gap-2 my-2 py-1 flex-grow-1">
+                                            <div class="user-img fs-42 flex-shrink-0">
+                                                <span class="avatar-title text-bg-primary rounded-circle fs-22">
+                                                    <iconify-icon icon="solar:wallet-money-bold-duotone"></iconify-icon>
+                                                </span>
+                                            </div>
+                                            <h3 class="mb-0 fw-bold">₱<?php echo number_format($todays_earnings, 2); ?> <small class="text-muted">PHP</small></h3>
+                                        </div>
+                                        <p class="mb-0 text-muted mt-auto">
+                                             <i class="ti ti-info-circle"></i> <a href="<?php echo base_url('orders/') ?>" class="link-info text-decoration-underline link-offset-2 link-underline-opacity-25 link-underline-opacity-100-hover">View more</a>
+                                        </p>
+                                    </div>
+                                </div>
+                            </div><!-- end col -->
+
+                            <div class="col mb-4">
+                                <div class="card h-100">
+                                    <div class="card-body d-flex flex-column">
+                                        <h5 class="text-muted fs-13 text-uppercase" title="Number of Users">Number of Users</h5>
+                                        <div class="d-flex align-items-center justify-content-center gap-2 my-2 py-1 flex-grow-1">
                                             <div class="user-img fs-42 flex-shrink-0">
                                                 <span class="avatar-title text-bg-primary rounded-circle fs-22">
                                                     <iconify-icon icon="solar:users-group-rounded-bold-duotone"></iconify-icon>
@@ -84,7 +84,7 @@
                                             </div>
                                             <h3 class="mb-0 fw-bold"><?php echo $total_users; ?></h3>
                                         </div>
-                                        <p class="mb-0 text-muted">
+                                        <p class="mb-0 text-muted mt-auto">
                                              <i class="ti ti-info-circle"></i> <a href="<?php echo base_url('users/') ?>" class="link-info text-decoration-underline link-offset-2 link-underline-opacity-25 link-underline-opacity-100-hover">View more</a>
                                         </p>
                                     </div>

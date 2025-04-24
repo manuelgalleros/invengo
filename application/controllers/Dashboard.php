@@ -28,7 +28,6 @@ class Dashboard extends Admin_Controller
 		$this->data['total_products'] = $this->model_products->countTotalProducts();
 		$this->data['total_paid_orders'] = $this->model_orders->countTotalPaidOrders();
 		$this->data['total_users'] = $this->model_users->countTotalUsers();
-		$this->data['total_stores'] = $this->model_stores->countTotalStores();
 		$this->data['todays_earnings'] = $this->model_orders->getTodaysEarnings();
 		
 		// Get recent activities for dashboard
@@ -75,7 +74,7 @@ class Dashboard extends Admin_Controller
 			$result = $query->row_array();
 			
 			$months[] = date('M', $month_start);
-			$earnings[] = ($result['total']) ? $result['total'] : 0;
+			$earnings[] = ($result['total']) ? round(floatval($result['total']), 2) : 0.00;
 		}
 		
 		return array(

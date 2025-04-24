@@ -214,7 +214,7 @@ class Products extends Admin_Controller
             $this->form_validation->set_rules('sku', 'SKU', 'trim|required');
             $this->form_validation->set_rules('sku', 'SKU', 'callback_check_duplicate');
             $this->form_validation->set_rules('price', 'Price', 'trim|required');
-            $this->form_validation->set_rules('description', 'Description', 'trim|required');
+            $this->form_validation->set_rules('barcode', 'Barcode', 'trim|required');
             $this->form_validation->set_rules('category', 'Category', 'trim|required');
             $this->form_validation->set_rules('brand', 'Brand', 'trim|required');
             $this->form_validation->set_rules('quantity', 'Quantity', 'trim|required|numeric');
@@ -1234,6 +1234,121 @@ class Products extends Admin_Controller
         }
 
         echo json_encode($response);
+    }
+
+    /*
+     * Fetches the product data by barcode via AJAX
+     */
+    public function fetch_product_by_barcode()
+    {
+        // Check permissions
+        if (!in_array('viewProduct', $this->permission)) {
+            $response = array(
+                'success' => false, 
+                'messages' => 'Permission denied'
+            );
+            echo json_encode($response);
+            return;
+        }
+        
+        // Get the barcode from POST data
+        $barcode = $this->input->post('barcode');
+        
+        // Validate barcode input
+        if (empty($barcode)) {
+            $response = array(
+                'success' => false,
+                'messages' => 'Barcode is required'
+            );
+            echo json_encode($response);
+            return;
+        }
+        
+        // Log the barcode being fetched
+        log_message('debug', 'Products: Fetching product with barcode: ' . $barcode);
+        
+        // Get product by barcode
+        $product = $this->model_products->getProductByBarcode($barcode);
+        
+        if ($product) {
+            // Log successful product retrieval
+            log_message('info', 'Products: Retrieved product by barcode: ' . $barcode . ' (Product: ' . $product['name'] . ', ID: ' . $product['id'] . ')');
+            
+            $response = array(
+                'success' => true,
+                'product' => $product,
+                'messages' => 'Product found'
+            );
+        } else {
+            // Log product not found
+            log_message('error', 'Products: Product not found with barcode: ' . $barcode);
+            
+            $response = array(
+                'success' => false,
+                'messages' => 'No product found with the given barcode'
+            );
+        }
+        
+        echo json_encode($response);
+    }
+
+    /**
+     * Lookup product by barcode
+     * Returns product data in JSON format
+     */
+    public function barcode_lookup()
+    {
+        // Check if user has permission
+        if(!in_array('viewProduct', $this->permission)) {
+            $this->output
+                ->set_content_type('application/json')
+                ->set_output(json_encode(['success' => false, 'message' => 'You do not have sufficient permission']));
+            return;
+        }
+
+        // Get barcode from request
+        $barcode = $this->input->get('barcode');
+        
+        // Validate barcode
+        if(!$barcode) {
+            log_message('error', 'Product barcode lookup failed: No barcode provided');
+            $this->output
+                ->set_content_type('application/json')
+                ->set_output(json_encode(['success' => false, 'message' => 'No barcode provided']));
+            return;
+        }
+
+        // Log the lookup attempt
+        log_message('info', 'Product barcode lookup attempt: ' . $barcode);
+        
+        // Get product data
+        $product = $this->model_products->getProductByBarcode($barcode);
+        
+        // Check if product exists
+        if($product) {
+            // Get category and brand names
+            if(isset($product['category_id']) && $product['category_id']) {
+                $product['category_name'] = $this->model_products->getCategoryNames($product['category_id']);
+            } else {
+                $product['category_name'] = '';
+            }
+            
+            if(isset($product['brand_id']) && $product['brand_id']) {
+                $product['brand'] = $this->model_products->getBrandName($product['brand_id']);
+            } else {
+                $product['brand'] = '';
+            }
+            
+            log_message('info', 'Product found for barcode: ' . $barcode);
+            $this->output
+                ->set_content_type('application/json')
+                ->set_output(json_encode(['success' => true, 'data' => $product]));
+        } else {
+            log_message('info', 'No product found for barcode: ' . $barcode);
+            $this->output
+                ->set_content_type('application/json')
+                ->set_output(json_encode(['success' => false, 'message' => 'No product found for barcode: ' . $barcode]));
+        }
     }
 
 }

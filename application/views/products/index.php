@@ -145,7 +145,7 @@
                                     </div>
                                     <div class="col-lg-6">
                                         <div class="mb-3">
-                                            <label for="productCode" class="form-label">Product Barcode</label>
+                                            <label for="productCode" class="form-label">Product Barcode <span class="text-danger fw-bold">*</span></label>
                                             <input type="text" class="form-control" id="productCode" name="barcode" placeholder="Enter barcode">
                                         </div>
                                     </div>
@@ -621,8 +621,10 @@ $(document).ready(function () {
                             var errorHtml = `
                                 <div class="alert alert-danger text-bg-danger alert-dismissible d-flex align-items-center" role="alert">
                                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
-                                    <iconify-icon icon="solar:danger-triangle-bold-duotone" class="fs-20 me-1"></iconify-icon>
-                                    <div class="lh-1">${errorMsg}</div>
+                                    <div class="d-flex align-items-center">
+                                        <iconify-icon icon="solar:danger-triangle-bold-duotone" class="fs-20 me-1"></iconify-icon>
+                                        <div class="lh-1">${errorMsg}</div>
+                                    </div>
                                 </div>
                             `;
                             
@@ -1437,6 +1439,91 @@ function hasDuplicateErrors() {
                $(this).text().includes('already registered');
     }).length > 0;
 }
+
+// Barcode scanner detection variables
+let barcodeBuffer = '';
+let lastKeyTime = 0;
+let barcodeTimeoutId = null;
+let consecutiveKeysCount = 0;
+
+// Create a dedicated barcode detection function
+function setupBarcodeDetection(modalElement, targetField) {
+    $(modalElement).on('shown.bs.modal', function() {
+        // Listen for keyboard events anywhere in the document
+        $(document).on('keydown.barcodeScanner', function(e) {
+            const now = new Date().getTime();
+            const keyPressInterval = now - lastKeyTime;
+            lastKeyTime = now;
+            
+            // Handle printable characters (most barcode content)
+            if (e.key.length === 1) {
+                // Fast typing is characteristic of barcode scanners (typically under 50ms between keys)
+                if (keyPressInterval < 50) {
+                    // If this is the start of what might be a barcode scan
+                    // or we're already collecting a barcode, prevent default action
+                    if (barcodeBuffer.length >= 0) {
+                        e.preventDefault();
+                    }
+                    
+                    // Start or continue collecting the barcode
+                    barcodeBuffer += e.key;
+                    consecutiveKeysCount++;
+                    
+                    // Reset any previous timeout
+                    if (barcodeTimeoutId) {
+                        clearTimeout(barcodeTimeoutId);
+                    }
+                    
+                    // Process the barcode after a short pause in input
+                    barcodeTimeoutId = setTimeout(function() {
+                        // Only process if we have enough characters to be a barcode
+                        if (barcodeBuffer.length >= 4) {
+                            // Place the barcode in the target field and focus it
+                            $(targetField).val(barcodeBuffer);
+                            $(targetField).focus();
+                        }
+                        
+                        // Reset state
+                        barcodeBuffer = '';
+                        consecutiveKeysCount = 0;
+                    }, 250);
+                } else {
+                    // If typing speed is normal human pace, reset the barcode buffer
+                    barcodeBuffer = e.key; // Start fresh with this character
+                    consecutiveKeysCount = 1;
+                }
+            } 
+            // Enter key often signals the end of a barcode scan
+            else if (e.key === 'Enter' && barcodeBuffer.length >= 4) {
+                $(targetField).val(barcodeBuffer);
+                $(targetField).focus();
+                
+                // Prevent the Enter key from submitting the form
+                e.preventDefault();
+                
+                // Reset barcode state
+                barcodeBuffer = '';
+                consecutiveKeysCount = 0;
+            }
+        });
+    });
+    
+    // Clean up event handlers when modal is closed
+    $(modalElement).on('hidden.bs.modal', function() {
+        $(document).off('keydown.barcodeScanner');
+        barcodeBuffer = '';
+        consecutiveKeysCount = 0;
+        
+        if (barcodeTimeoutId) {
+            clearTimeout(barcodeTimeoutId);
+            barcodeTimeoutId = null;
+        }
+    });
+}
+
+// Set up barcode detection for both modals
+setupBarcodeDetection('#addProductModal', '#productCode');
+setupBarcodeDetection('#editProductModal', '#edit_productCode');
 </script>
 
 

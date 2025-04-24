@@ -517,62 +517,99 @@ class Orders extends Admin_Controller
         }
 
         $order_id = $this->input->post('order_id');
+        log_message('debug', 'Remove method called with order ID: ' . (is_array($order_id) ? json_encode($order_id) : $order_id));
         
         if($order_id) {
-            // Get order data before deletion for logging
-            $order_data = $this->model_orders->getOrdersData($order_id);
-            
-            // Check if order data exists
-            if(!$order_data) {
-                $response['success'] = false;
-                $response['messages'] = "Order not found. It may have been deleted.";
-                log_message('error', 'Delete failed: Order ID ' . $order_id . ' not found');
-                echo json_encode($response);
-                return;
-            }
-            
-            // Debug log the order data for troubleshooting
-            error_log('ORDER DATA for deletion: ' . json_encode($order_data));
-            $order_no = isset($order_data['order_no']) ? $order_data['order_no'] : '[unknown]';
-            
-            $delete = $this->model_orders->remove($order_id);
-            if($delete == true) {
-                // Log successful order deletion with explicit order number
-                error_log("Successfully deleted order " . $order_no);
+            // Handle both single ID and array of IDs for deletion
+            if(is_array($order_id)) {
+                // Multiple orders case
+                $delete = $this->model_orders->remove($order_id);
+                if($delete == true) {
+                    // Log successful deletion of multiple orders
+                    log_activity(
+                        'delete',
+                        'Orders',
+                        'Deleted ' . count($order_id) . ' orders',
+                        true
+                    );
+                    
+                    $response['success'] = true;
+                    $response['messages'] = "Successfully removed";
+                    $response['order_count'] = count($order_id);
+                    
+                    log_message('debug', 'Deleted ' . count($order_id) . ' orders');
+                }
+                else {
+                    // Log failed deletion
+                    log_activity(
+                        'delete',
+                        'Orders',
+                        'Failed to delete ' . count($order_id) . ' orders',
+                        false
+                    );
+                    
+                    $response['success'] = false;
+                    $response['messages'] = "Error in the database while removing the orders";
+                    log_message('error', 'Delete failed with database error: ' . $this->db->error()['message']);
+                }
+            } else {
+                // Single order case
+                // Get order data before deletion for logging
+                $order_data = $this->model_orders->getOrdersData($order_id);
                 
-                // Make sure we're including the order number in the log description
-                $log_description = "Deleted order " . $order_no;
-                log_activity(
-                    'delete',
-                    'Orders',
-                    $log_description,
-                    true
-                );
+                // Check if order data exists
+                if(!$order_data) {
+                    $response['success'] = false;
+                    $response['messages'] = "Order not found. It may have been deleted.";
+                    log_message('error', 'Delete failed: Order ID ' . $order_id . ' not found');
+                    echo json_encode($response);
+                    return;
+                }
                 
-                $response['success'] = true;
-                $response['messages'] = "Successfully removed";
-                $response['order_no'] = $order_no;
+                // Debug log the order data for troubleshooting
+                log_message('debug', 'ORDER DATA for deletion: ' . json_encode($order_data));
+                $order_no = isset($order_data['order_no']) ? $order_data['order_no'] : '[unknown]';
                 
-                log_message('debug', 'Deleted order: ' . $order_no);
-            }
-            else {
-                // Log failed order deletion
-                error_log("Failed to delete order " . $order_no);
-                log_activity(
-                    'delete',
-                    'Orders',
-                    'Failed to delete order ' . $order_no,
-                    false
-                );
-                
-                $response['success'] = false;
-                $response['messages'] = "Error in the database while removing the order";
-                log_message('error', 'Delete failed with database error: ' . $this->db->error()['message']);
+                $delete = $this->model_orders->remove($order_id);
+                if($delete == true) {
+                    // Log successful order deletion with explicit order number
+                    log_message('info', "Successfully deleted order " . $order_no);
+                    
+                    // Make sure we're including the order number in the log description
+                    $log_description = "Deleted order " . $order_no;
+                    log_activity(
+                        'delete',
+                        'Orders',
+                        $log_description,
+                        true
+                    );
+                    
+                    $response['success'] = true;
+                    $response['messages'] = "Successfully removed";
+                    $response['order_no'] = $order_no;
+                    
+                    log_message('debug', 'Deleted order: ' . $order_no);
+                }
+                else {
+                    // Log failed order deletion
+                    log_message('error', "Failed to delete order " . $order_no);
+                    log_activity(
+                        'delete',
+                        'Orders',
+                        'Failed to delete order ' . $order_no,
+                        false
+                    );
+                    
+                    $response['success'] = false;
+                    $response['messages'] = "Error in the database while removing the order";
+                    log_message('error', 'Delete failed with database error: ' . $this->db->error()['message']);
+                }
             }
         }
         else {
             $response['success'] = false;
             $response['messages'] = "Please refresh the page again!!";
+            log_message('error', 'Delete failed: No order ID provided');
         }
 
         echo json_encode($response);
@@ -1279,5 +1316,93 @@ class Orders extends Admin_Controller
         // Format the date in the required format
         return date('F j, Y h:i A', $timestamp);
     }
+
+	/**
+	 * Get product by barcode
+	 * Used by the order creation page for barcode scanning
+	 */
+	public function getProductByBarcode()
+	{
+		// Check permission
+		if(!in_array('createOrder', $this->permission) && !in_array('updateOrder', $this->permission)) {
+			echo json_encode(array(
+				'success' => false,
+				'message' => 'You do not have permission to access this function'
+			));
+			return;
+		}
+		
+		// Get barcode from post data
+		$barcode = $this->input->post('barcode');
+		
+		// Log the raw input details
+		log_message('debug', '--- BEGIN BARCODE LOOKUP ---');
+		log_message('debug', 'Raw barcode input value: "' . $barcode . '"');
+		log_message('debug', 'Barcode type: ' . gettype($barcode));
+		log_message('debug', 'Barcode length: ' . strlen($barcode));
+		
+		// Log the first few characters for debugging
+		if(strlen($barcode) > 0) {
+			$first_char = substr($barcode, 0, 1);
+			log_message('debug', 'First character: "' . $first_char . '", ASCII: ' . ord($first_char));
+			
+			if(strlen($barcode) > 1) {
+				$second_char = substr($barcode, 1, 1);
+				log_message('debug', 'Second character: "' . $second_char . '", ASCII: ' . ord($second_char));
+			}
+		}
+		
+		if(!$barcode) {
+			log_message('debug', 'No barcode provided');
+			echo json_encode(array(
+				'success' => false,
+				'message' => 'No barcode provided'
+			));
+			return;
+		}
+		
+		// Log the lookup request
+		log_message('debug', 'Orders: Looking up product by barcode: "' . $barcode . '"');
+		
+		// Get product by barcode
+		$product = $this->model_products->getProductByBarcode($barcode);
+		
+		if($product) {
+			// Format the image path
+			if(isset($product['image']) && $product['image'] && $product['image'] != 'no-image.jpg') {
+				$product['image'] = 'assets/images/product_images/' . $product['image'];
+			} else {
+				$product['image'] = 'assets/images/product-default.jpg';
+			}
+			
+			// Log successful lookup
+			log_message('info', 'Orders: Product found for barcode: "' . $barcode . '" (Product ID: ' . $product['id'] . ')');
+			log_message('debug', '--- END BARCODE LOOKUP ---');
+			
+			echo json_encode(array(
+				'success' => true,
+				'product' => $product
+			));
+		} else {
+			// Log failed lookup
+			log_message('info', 'Orders: No product found for barcode: "' . $barcode . '"');
+			
+			// Query the database directly to check what barcodes exist
+			$query = $this->db->query("SELECT id, name, barcode FROM products LIMIT 10");
+			if($query->num_rows() > 0) {
+				log_message('debug', 'Sample barcodes in database:');
+				foreach($query->result_array() as $row) {
+					log_message('debug', 'ID: ' . $row['id'] . ', Name: ' . $row['name'] . ', Barcode: "' . $row['barcode'] . '", Barcode Type: ' . gettype($row['barcode']));
+				}
+			}
+			
+			log_message('debug', '--- END BARCODE LOOKUP ---');
+			
+			echo json_encode(array(
+				'success' => false,
+				'message' => 'No product found with this barcode'
+			));
+		}
+	}
 
 }

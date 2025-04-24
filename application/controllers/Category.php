@@ -267,35 +267,62 @@ class Category extends Admin_Controller
 
 		$response = array();
 		if($category_id) {
-			$delete = $this->model_category->remove($category_id);
-			if($delete == true) {
-				// Log successful category deletion with category ID and name
-				$this->logs->logActivity(
-					'delete',
-					'Categories',
-					'Deleted category: ' . $category_name . ' (ID: ' . (is_array($category_id) ? json_encode($category_id) : $category_id) . ')',
-					true
-				);
-				
-				$response['success'] = true;
-				$response['messages'] = "Successfully removed";	
-			}
-			else {
-				// Log failed category deletion
-				$this->logs->logActivity(
-					'delete',
-					'Categories',
-					'Failed to delete category: ' . $category_name . ' (ID: ' . (is_array($category_id) ? json_encode($category_id) : $category_id) . ')',
-					false
-				);
-				
-				$response['success'] = false;
-				$response['messages'] = "Error in the database while removing the category information";
+			try {
+				$delete = $this->model_category->remove($category_id);
+				if($delete == true) {
+					// Log successful category deletion with category ID and name
+					$this->logs->logActivity(
+						'delete',
+						'Categories',
+						'Deleted category: ' . $category_name . ' (ID: ' . (is_array($category_id) ? json_encode($category_id) : $category_id) . ')',
+						true
+					);
+					
+					$response['success'] = true;
+					$response['messages'] = "Successfully removed";	
+				}
+				else {
+					// Log failed category deletion
+					$this->logs->logActivity(
+						'delete',
+						'Categories',
+						'Failed to delete category: ' . $category_name . ' (ID: ' . (is_array($category_id) ? json_encode($category_id) : $category_id) . ')',
+						false
+					);
+					
+					$response['success'] = false;
+					$response['messages'] = "Error in the database while removing the category information";
+				}
+			} catch (Exception $e) {
+				// Check if this is a foreign key constraint violation
+				if (strpos($e->getMessage(), 'foreign key constraint fails') !== false) {
+					// Log constraint error
+					$this->logs->logActivity(
+						'delete',
+						'Categories',
+						'Cannot delete category: ' . $category_name . ' (ID: ' . $category_id . ') because it has assigned products',
+						false
+					);
+					
+					$response['success'] = false;
+					$response['messages'] = 'Cannot delete this category because it has products assigned to it. Please reassign or delete the products first.';
+				} else {
+					// Log other errors
+					$this->logs->logActivity(
+						'delete',
+						'Categories',
+						'Error deleting category: ' . $category_name . ' (ID: ' . $category_id . ') - ' . $e->getMessage(),
+						false
+					);
+					
+					$response['success'] = false;
+					$response['messages'] = 'Error deleting category: ' . $e->getMessage();
+				}
 			}
 		}
 		else {
 			$response['success'] = false;
-			$response['messages'] = "Refersh the page again!!";
+			$response['messages'] = "Refresh the page again!!";
 		}
 
 		echo json_encode($response);

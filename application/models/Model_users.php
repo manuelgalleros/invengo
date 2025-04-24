@@ -58,7 +58,7 @@ class Model_users extends CI_Model
 			}
 
 			$user_id = $this->db->insert_id();
-			
+
 			if (!$user_id) {
 				log_message('error', 'Model_users create - no insert ID returned');
 				$this->db->trans_rollback();
@@ -73,7 +73,7 @@ class Model_users extends CI_Model
 
 			// Insert group data
 			$group_insert = $this->db->insert('user_group', $group_data);
-			
+
 			if (!$group_insert) {
 				log_message('error', 'Model_users create - failed to insert user_group: ' . $this->db->error()['message']);
 				$this->db->trans_rollback();

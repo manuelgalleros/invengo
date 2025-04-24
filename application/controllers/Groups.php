@@ -235,10 +235,18 @@ class Groups extends Admin_Controller
 		}
 
 		if($id) {
-			if(!$this->model_groups->existInUserGroup($id)) {
-				// Get group data before deletion for logging
-				$group_data = $this->model_groups->getGroupData($id);
-				
+			// Get group data before deletion for logging
+			$group_data = $this->model_groups->getGroupData($id);
+			if (!$group_data) {
+				if($this->input->is_ajax_request()) {
+					echo json_encode(['success' => false, 'message' => 'Group not found']);
+					return;
+				}
+				$this->session->set_flashdata('error', 'Group not found');
+				redirect('groups/', 'refresh');
+			}
+			
+			try {
 				$delete = $this->model_groups->delete($id);
 				if($delete == true) {
 					// Log successful group deletion
@@ -272,14 +280,39 @@ class Groups extends Admin_Controller
 					$this->session->set_flashdata('error', 'Error occurred!!');
 					redirect('groups/', 'refresh');
 				}
-			}
-			else {
-				if($this->input->is_ajax_request()) {
-					echo json_encode(['success' => false, 'message' => 'This group is already in use']);
-					return;
+			} catch (Exception $e) {
+				// Check if this is a foreign key constraint violation
+				if (strpos($e->getMessage(), 'foreign key constraint fails') !== false) {
+					// Log constraint error
+					$this->logs->logActivity(
+						'delete',
+						'Groups',
+						'Cannot delete group: ' . $group_data['group_name'] . ' because it has assigned users',
+						false
+					);
+					
+					if($this->input->is_ajax_request()) {
+						echo json_encode(['success' => false, 'message' => 'Cannot delete this group because it has users assigned to it. Please reassign the users first.']);
+						return;
+					}
+					$this->session->set_flashdata('error', 'Cannot delete this group because it has users assigned to it. Please reassign the users first.');
+					redirect('groups/', 'refresh');
+				} else {
+					// Log other errors
+					$this->logs->logActivity(
+						'delete',
+						'Groups',
+						'Error deleting group: ' . $group_data['group_name'] . ' - ' . $e->getMessage(),
+						false
+					);
+					
+					if($this->input->is_ajax_request()) {
+						echo json_encode(['success' => false, 'message' => 'Error deleting group: ' . $e->getMessage()]);
+						return;
+					}
+					$this->session->set_flashdata('error', 'Error deleting group: ' . $e->getMessage());
+					redirect('groups/', 'refresh');
 				}
-				$this->session->set_flashdata('error', 'This group is already in use');
-				redirect('groups/', 'refresh');
 			}
 		}
 	}
@@ -383,30 +416,66 @@ class Groups extends Admin_Controller
 		
 		$success_count = 0;
 		$error_count = 0;
-		$user_groups = 0;
+		$constraint_count = 0;
 		$deleted_names = [];
 		
 		// Process each group
 		foreach($group_ids as $id) {
 			// Get group name before deletion
 			$group_data = $this->model_groups->getGroupData($id);
-			
-			// Check if group exists in users
-			$check = $this->model_groups->existInUserGroup($id);
-			if($check == true) {
-				$user_groups++;
+			if (!$group_data) {
+				$error_count++;
 				continue;
 			}
 			
-			// Delete group
-			$delete = $this->model_groups->delete($id);
-			if($delete) {
-				$success_count++;
-				if($group_data) {
+			try {
+				// Delete group
+				$delete = $this->model_groups->delete($id);
+				if($delete) {
+					$success_count++;
 					$deleted_names[] = $group_data['group_name'];
+					
+					// Log successful deletion
+					$this->logs->logActivity(
+						'delete',
+						'Groups',
+						'Deleted group: ' . $group_data['group_name'],
+						true
+					);
+				} else {
+					$error_count++;
+					
+					// Log failed deletion
+					$this->logs->logActivity(
+						'delete',
+						'Groups',
+						'Failed to delete group: ' . $group_data['group_name'],
+						false
+					);
 				}
-			} else {
-				$error_count++;
+			} catch (Exception $e) {
+				// Check if this is a foreign key constraint violation
+				if (strpos($e->getMessage(), 'foreign key constraint fails') !== false) {
+					$constraint_count++;
+					
+					// Log constraint error
+					$this->logs->logActivity(
+						'delete',
+						'Groups',
+						'Cannot delete group: ' . $group_data['group_name'] . ' because it has assigned users',
+						false
+					);
+				} else {
+					$error_count++;
+					
+					// Log other errors
+					$this->logs->logActivity(
+						'delete',
+						'Groups',
+						'Error deleting group: ' . $group_data['group_name'] . ' - ' . $e->getMessage(),
+						false
+					);
+				}
 			}
 		}
 		
@@ -415,8 +484,8 @@ class Groups extends Admin_Controller
 		if($success_count > 0) {
 			$message .= $success_count . ' group(s) successfully deleted.';
 		}
-		if($user_groups > 0) {
-			$message .= ($message ? ' ' : '') . $user_groups . ' group(s) could not be deleted because they are assigned to users.';
+		if($constraint_count > 0) {
+			$message .= ($message ? ' ' : '') . $constraint_count . ' group(s) could not be deleted because they have users assigned.';
 		}
 		if($error_count > 0) {
 			$message .= ($message ? ' ' : '') . $error_count . ' group(s) failed to delete due to errors.';
@@ -424,10 +493,10 @@ class Groups extends Admin_Controller
 		
 		echo json_encode([
 			'success' => ($success_count > 0),
-			'message' => $message,
+			'message' => $message ?: 'No groups were deleted',
 			'deleted_count' => $success_count,
-			'error_count' => $error_count + $user_groups,
-			'deleted_names' => $deleted_names
+			'constraint_count' => $constraint_count,
+			'error_count' => $error_count
 		]);
 	}
 

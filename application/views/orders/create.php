@@ -298,6 +298,254 @@
     // Initialize on page load
     initializeSelect2();
     
+    // Barcode scanner detection
+    let barcodeBuffer = '';
+    let lastKeyTime = 0;
+    let potentiallyScanning = false;
+    const BARCODE_SCAN_SPEED = 20; // ms between keypresses for barcode scanner
+    
+    // Create a global flag to track barcode processing
+    window.isProcessingBarcode = false;
+    
+    $(document).on('keydown', function(e) {
+      const currentTime = new Date().getTime();
+      const timeDiff = currentTime - lastKeyTime;
+      lastKeyTime = currentTime;
+      
+      // Check if this is a fast keypress (likely from barcode scanner)
+      if(timeDiff < BARCODE_SCAN_SPEED) {
+        potentiallyScanning = true;
+        
+        // Prevent default behavior for all fast keypresses
+        e.preventDefault();
+      }
+      
+      // Collect keypresses into buffer
+      if((potentiallyScanning || timeDiff < BARCODE_SCAN_SPEED) && e.key.length === 1) {
+        console.log('Adding to barcode buffer:', e.key);
+        barcodeBuffer += e.key;
+        e.preventDefault();
+      }
+      
+      // Process the barcode when Enter is pressed
+      if((potentiallyScanning || timeDiff < BARCODE_SCAN_SPEED) && (e.key === 'Enter' || e.keyCode === 13)) {
+        e.preventDefault();
+        
+        if(barcodeBuffer.length > 0) {
+          console.log('Full barcode detected:', barcodeBuffer);
+          
+          // Set the global flag to indicate barcode processing
+          window.isProcessingBarcode = true;
+          
+          // Process the scanned barcode
+          processScannedBarcode(barcodeBuffer);
+          
+          // Reset the barcode buffer
+          barcodeBuffer = '';
+          
+          // Don't reset potentiallyScanning flag immediately to allow for multiple scans
+          setTimeout(function() {
+            potentiallyScanning = false;
+            
+            // Reset the barcode processing flag after a delay
+            setTimeout(function() {
+              window.isProcessingBarcode = false;
+            }, 1000);
+          }, 300);
+        }
+      }
+    });
+    
+    // Process barcode when we lose focus (as a fallback)
+    $(window).on('blur', function() {
+      if(potentiallyScanning && barcodeBuffer.length > 0) {
+        console.log('Processing barcode on blur:', barcodeBuffer);
+        processScannedBarcode(barcodeBuffer);
+        barcodeBuffer = '';
+        potentiallyScanning = false;
+      }
+    });
+    
+    // Function to process the scanned barcode
+    function processScannedBarcode(barcode) {
+      // Debug information about the barcode
+      console.log('Processing barcode:', {
+        'value': barcode,
+        'length': barcode.length,
+        'first character': barcode.charAt(0),
+        'character codes': Array.from(barcode).map(c => c.charCodeAt(0).toString())
+      });
+      
+      // Find product by barcode via AJAX
+      $.ajax({
+        url: base_url + 'orders/getProductByBarcode',
+        type: 'post',
+        data: {barcode: barcode},
+        dataType: 'json',
+        beforeSend: function() {
+          console.log('Sending AJAX request with barcode:', barcode);
+        },
+        success: function(response) {
+          console.log('Server response:', response);
+          
+          if(response.success) {
+            // Product found, add to cart
+            addProductToCart(response.product);
+            
+            // Reset potentiallyScanning flag after successful scan to prepare for the next one
+            setTimeout(function() {
+              potentiallyScanning = false;
+              console.log('Ready for next barcode scan');
+            }, 100);
+          } else {
+            // Product not found, show error message
+            $('#messages').html(`
+              <div class="alert alert-warning text-bg-warning alert-dismissible d-flex align-items-center auto-dismiss" role="alert">
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+                <iconify-icon icon="solar:danger-triangle-bold-duotone" class="fs-20 me-1"></iconify-icon>
+                <div class="lh-1">Barcode not found: ${barcode}</div>
+              </div>
+            `);
+            
+            // Initialize auto-dismiss for the alert
+            initializeAutoDismissAlerts();
+            
+            // Reset potentiallyScanning flag after error to prepare for the next scan
+            potentiallyScanning = false;
+          }
+        },
+        error: function(xhr, status, error) {
+          console.error('AJAX error:', {xhr: xhr, status: status, error: error});
+          
+          // Error processing request
+          $('#messages').html(`
+            <div class="alert alert-danger text-bg-danger alert-dismissible d-flex align-items-center auto-dismiss" role="alert">
+              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+              <iconify-icon icon="solar:danger-triangle-bold-duotone" class="fs-20 me-1"></iconify-icon>
+              <div class="lh-1">Error processing barcode: ${barcode}</div>
+            </div>
+          `);
+          
+          // Initialize auto-dismiss for the alert
+          initializeAutoDismissAlerts();
+          
+          // Reset potentiallyScanning flag after error to prepare for the next scan
+          potentiallyScanning = false;
+        }
+      });
+    }
+    
+    // Function to add a product to the cart
+    function addProductToCart(product) {
+      console.log('Adding product to cart:', product);
+      
+      // First check if product is already in the cart
+      let productExists = false;
+      let existingRowId = null;
+      
+      // Loop through product rows to check if product already exists
+      $("#product_info_table tbody tr").each(function() {
+        const rowId = $(this).attr('id').substring(4);
+        const productId = $("#product_" + rowId).val();
+        
+        console.log('Checking row:', rowId, 'Product ID:', productId, 'Against:', product.id);
+        
+        if(productId == product.id) {
+          productExists = true;
+          existingRowId = rowId;
+          return false; // break the loop
+        }
+      });
+      
+      if(productExists) {
+        console.log('Product exists in cart, incrementing quantity in row:', existingRowId);
+        // Product already exists, increment quantity
+        const currentQty = parseInt($("#qty_" + existingRowId).val()) || 0;
+        $("#qty_" + existingRowId).val(currentQty + 1);
+        getTotal(existingRowId);
+        
+        // Show success message
+        $('#messages').html(`
+          <div class="alert alert-info text-bg-info alert-dismissible d-flex align-items-center auto-dismiss" role="alert">
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+            <iconify-icon icon="solar:check-read-line-duotone" class="fs-20 me-1"></iconify-icon>
+            <div class="lh-1">Added one more ${product.name} to cart</div>
+          </div>
+        `);
+        
+        // Initialize auto-dismiss for the alert
+        initializeAutoDismissAlerts();
+        
+        // Update cart display
+        updateCartDisplay();
+      } else {
+        console.log('Product not in cart, adding new row');
+        // Product doesn't exist, add new row
+        // Get the table rows
+        const tableRows = $("#product_info_table tbody tr");
+        const tableRowsCount = tableRows.length;
+        
+        console.log('Table rows count:', tableRowsCount);
+        
+        // Check if the first row is empty
+        const firstRowProduct = $("#product_1").val();
+        let rowId;
+        
+        if(!firstRowProduct && tableRowsCount > 0) {
+          // If first row exists and is empty, use it
+          rowId = 1;
+          console.log('Using first empty row');
+          addProductToNewRow(product, rowId);
+        } else {
+          // Otherwise, add a new row
+          rowId = tableRowsCount + 1;
+          console.log('Adding new row with ID:', rowId);
+          
+          // Call add_row to create a new row
+          $("#add_row").trigger('click');
+          
+          // Short delay to ensure the row is added to the DOM
+          setTimeout(function() {
+            addProductToNewRow(product, rowId);
+          }, 300);
+        }
+      }
+    }
+    
+    // Helper function to add product to a specific row
+    function addProductToNewRow(product, rowId) {
+      console.log('Setting product in row:', rowId, 'Product:', product);
+      
+      // Set the barcode processing flag before changing the product
+      window.isProcessingBarcode = true;
+      
+      // Set the product in the dropdown
+      $("#product_" + rowId).val(product.id).trigger('change');
+      
+      // Trigger the product data fetch
+      getProductData(rowId);
+      
+      // Show success message
+      $('#messages').html(`
+        <div class="alert alert-success text-bg-success alert-dismissible d-flex align-items-center auto-dismiss" role="alert">
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+          <iconify-icon icon="solar:check-read-line-duotone" class="fs-20 me-1"></iconify-icon>
+          <div class="lh-1">Added ${product.name} to cart</div>
+        </div>
+      `);
+      
+      // Initialize auto-dismiss for the alert
+      initializeAutoDismissAlerts();
+      
+      // Update cart display
+      updateCartDisplay();
+      
+      // After a delay, reset the barcode processing flag
+      setTimeout(function() {
+        window.isProcessingBarcode = false;
+      }, 500);
+    }
+    
     // Create a MutationObserver to detect when new rows are added to the table
     const productTableObserver = new MutationObserver(function(mutations) {
       mutations.forEach(function(mutation) {
@@ -833,9 +1081,13 @@
         $("#amount_" + row_id).val(amount.toFixed(2));
         $("#amount_value_" + row_id).val(amount.toFixed(2));
         
-        // Auto-focus on the quantity field for immediate editing
-        $("#qty_" + row_id).focus();
-        $("#qty_" + row_id).select();
+        // Only focus on the quantity field if this wasn't triggered by a barcode scan
+        // We check a global flag that's set during barcode processing
+        if (!window.isProcessingBarcode) {
+          // Auto-focus on the quantity field for immediate editing
+          $("#qty_" + row_id).focus();
+          $("#qty_" + row_id).select();
+        }
         
         subAmount();
         updateCartDisplay();

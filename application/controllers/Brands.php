@@ -244,34 +244,60 @@ class Brands extends Admin_Controller
 		    if (is_array($brand_ids)) {
 		        $deleted_brands = [];
 		        $failed_brands = [];
+		        $constraint_brands = [];
 		        
 		        foreach ($brand_ids as $id) {
                     // Get brand data before deletion for logging
                     $brand_data = $this->model_brands->getBrandData($id);
                     $brand_name = (is_array($brand_data) && isset($brand_data['name'])) ? $brand_data['name'] : 'Unknown';
                     
-                    $delete = $this->model_brands->remove($id);
-                    
-                    if ($delete) {
-                        $deleted_brands[] = $brand_name;
+                    try {
+                        $delete = $this->model_brands->remove($id);
                         
-                        // Log each successful deletion
-                        $this->logs->logActivity(
-                            'delete',
-                            'Brands',
-                            'Deleted brand: ' . $brand_name . ' (ID: ' . $id . ')',
-                            true
-                        );
-                    } else {
-                        $failed_brands[] = $brand_name;
-                        
-                        // Log each failed deletion
-                        $this->logs->logActivity(
-                            'delete',
-                            'Brands',
-                            'Failed to delete brand: ' . $brand_name . ' (ID: ' . $id . ')',
-                            false
-                        );
+                        if ($delete) {
+                            $deleted_brands[] = $brand_name;
+                            
+                            // Log each successful deletion
+                            $this->logs->logActivity(
+                                'delete',
+                                'Brands',
+                                'Deleted brand: ' . $brand_name . ' (ID: ' . $id . ')',
+                                true
+                            );
+                        } else {
+                            $failed_brands[] = $brand_name;
+                            
+                            // Log each failed deletion
+                            $this->logs->logActivity(
+                                'delete',
+                                'Brands',
+                                'Failed to delete brand: ' . $brand_name . ' (ID: ' . $id . ')',
+                                false
+                            );
+                        }
+                    } catch (Exception $e) {
+                        // Check if this is a foreign key constraint violation
+                        if (strpos($e->getMessage(), 'foreign key constraint fails') !== false) {
+                            $constraint_brands[] = $brand_name;
+                            
+                            // Log constraint error
+                            $this->logs->logActivity(
+                                'delete',
+                                'Brands',
+                                'Cannot delete brand: ' . $brand_name . ' (ID: ' . $id . ') because it has assigned products',
+                                false
+                            );
+                        } else {
+                            $failed_brands[] = $brand_name;
+                            
+                            // Log other errors
+                            $this->logs->logActivity(
+                                'delete',
+                                'Brands',
+                                'Error deleting brand: ' . $brand_name . ' (ID: ' . $id . ') - ' . $e->getMessage(),
+                                false
+                            );
+                        }
                     }
 		        }
 		        
@@ -279,9 +305,17 @@ class Brands extends Admin_Controller
 		        if (count($deleted_brands) > 0) {
 		            $response['success'] = true;
 		            $response['messages'] = count($deleted_brands) . " brand(s) successfully removed";
-		            if (count($failed_brands) > 0) {
-		                $response['messages'] .= ", " . count($failed_brands) . " failed";
+		            
+		            if (count($constraint_brands) > 0) {
+		                $response['messages'] .= ", " . count($constraint_brands) . " brand(s) could not be deleted because they have products assigned";
 		            }
+		            
+		            if (count($failed_brands) > 0) {
+		                $response['messages'] .= ", " . count($failed_brands) . " failed due to other errors";
+		            }
+		        } else if (count($constraint_brands) > 0) {
+		            $response['success'] = false;
+		            $response['messages'] = count($constraint_brands) . " brand(s) could not be deleted because they have products assigned";
 		        } else {
 		            $response['success'] = false;
 		            $response['messages'] = "Failed to remove brands";
@@ -302,32 +336,59 @@ class Brands extends Admin_Controller
             $brand_data = $this->model_brands->getBrandData($brand_id);
             $brand_name = (is_array($brand_data) && isset($brand_data['name'])) ? $brand_data['name'] : 'Unknown';
             
-			$delete = $this->model_brands->remove($brand_id);
-
-			if($delete == true) {
-                // Log successful brand deletion
-                $this->logs->logActivity(
-                    'delete',
-                    'Brands',
-                    'Deleted brand: ' . $brand_name . ' (ID: ' . $brand_id . ')',
-                    true
-                );
-                
-				$response['success'] = true;
-				$response['messages'] = "Successfully removed";	
-			}
-			else {
-                // Log failed brand deletion
-                $this->logs->logActivity(
-                    'delete',
-                    'Brands',
-                    'Failed to delete brand: ' . $brand_name . ' (ID: ' . $brand_id . ')',
-                    false
-                );
-                
-				$response['success'] = false;
-				$response['messages'] = 'Error in the database while removing the brand information';
-			}
+            try {
+                $delete = $this->model_brands->remove($brand_id);
+    
+                if($delete == true) {
+                    // Log successful brand deletion
+                    $this->logs->logActivity(
+                        'delete',
+                        'Brands',
+                        'Deleted brand: ' . $brand_name . ' (ID: ' . $brand_id . ')',
+                        true
+                    );
+                    
+                    $response['success'] = true;
+                    $response['messages'] = "Successfully removed";	
+                }
+                else {
+                    // Log failed brand deletion
+                    $this->logs->logActivity(
+                        'delete',
+                        'Brands',
+                        'Failed to delete brand: ' . $brand_name . ' (ID: ' . $brand_id . ')',
+                        false
+                    );
+                    
+                    $response['success'] = false;
+                    $response['messages'] = 'Error in the database while removing the brand information';
+                }
+            } catch (Exception $e) {
+                // Check if this is a foreign key constraint violation
+                if (strpos($e->getMessage(), 'foreign key constraint fails') !== false) {
+                    // Log constraint error
+                    $this->logs->logActivity(
+                        'delete',
+                        'Brands',
+                        'Cannot delete brand: ' . $brand_name . ' (ID: ' . $brand_id . ') because it has assigned products',
+                        false
+                    );
+                    
+                    $response['success'] = false;
+                    $response['messages'] = 'Cannot delete this brand because it has products assigned to it. Please reassign or delete the products first.';
+                } else {
+                    // Log other errors
+                    $this->logs->logActivity(
+                        'delete',
+                        'Brands',
+                        'Error deleting brand: ' . $brand_name . ' (ID: ' . $brand_id . ') - ' . $e->getMessage(),
+                        false
+                    );
+                    
+                    $response['success'] = false;
+                    $response['messages'] = 'Error deleting brand: ' . $e->getMessage();
+                }
+            }
 		}
 		else {
 			$response['success'] = false;

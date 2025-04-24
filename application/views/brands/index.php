@@ -474,8 +474,11 @@ $(document).ready(function() {
             data: { brand_id: brandIds },
             dataType: "json",
             success: function(response) {
+                // Close the modal regardless of success or failure
+                $('#removeBrandModal').modal('hide');
+                
                 if(response.success) {
-                    $('#removeBrandModal').modal('hide');
+                    // Success message
                     $('#messages').html(`
                         <div class="alert alert-success text-bg-success alert-dismissible d-flex align-items-center">
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
@@ -483,8 +486,35 @@ $(document).ready(function() {
                             <div class="lh-1">${response.messages}</div>
                         </div>
                     `);
-                    loadBrandTable();
+                } else {
+                    // Error message
+                    $('#messages').html(`
+                        <div class="alert alert-danger text-bg-danger alert-dismissible d-flex align-items-center">
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+                            <iconify-icon icon="solar:danger-triangle-line-duotone" class="fs-20 me-1"></iconify-icon>
+                            <div class="lh-1">${response.messages}</div>
+                        </div>
+                    `);
                 }
+                
+                // Reload the table to reflect changes
+                loadBrandTable();
+                
+                // Auto dismiss messages
+                autoDismissMessages();
+            },
+            error: function(xhr, status, error) {
+                // Handle any AJAX errors
+                $('#removeBrandModal').modal('hide');
+                $('#messages').html(`
+                    <div class="alert alert-danger text-bg-danger alert-dismissible d-flex align-items-center">
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+                        <iconify-icon icon="solar:danger-triangle-line-duotone" class="fs-20 me-1"></iconify-icon>
+                        <div class="lh-1">An error occurred while processing your request.</div>
+                    </div>
+                `);
+                
+                // Auto dismiss messages
                 autoDismissMessages();
             }
         });

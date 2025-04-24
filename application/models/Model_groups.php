@@ -35,9 +35,33 @@ class Model_groups extends CI_Model
 
 	public function delete($id)
 	{
-		$this->db->where('id', $id);
-		$delete = $this->db->delete('groups');
-		return ($delete == true) ? true : false;
+		if($id) {
+			try {
+				$this->db->where('id', $id);
+				$result = $this->db->delete('groups');
+				
+				// Check if there was a database error
+				if ($this->db->error()['code']) {
+					$error_message = $this->db->error()['message'];
+					
+					// Check if it's a foreign key constraint violation
+					if (strpos($error_message, 'foreign key constraint fails') !== false) {
+						throw new Exception('Cannot delete group with ID ' . $id . ' because it has users assigned to it.');
+					}
+					
+					// For other database errors
+					throw new Exception('Database error: ' . $error_message);
+				}
+				
+				return ($result === true) ? true : false;
+			} catch (Exception $e) {
+				// Log the error
+				log_message('error', 'Group deletion error: ' . $e->getMessage());
+				
+				// Re-throw the exception to be caught by the controller
+				throw $e;
+			}
+		}
 	}
 
 	public function existInUserGroup($id)

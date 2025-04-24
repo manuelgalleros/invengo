@@ -67,7 +67,7 @@
                                                     </div>
                                                     <div class="col-lg-6">
                                                         <div class="mb-3">
-                                                            <label for="productCode" class="form-label">Product Barcode</label>
+                                                            <label for="productCode" class="form-label">Product Barcode <span class="text-danger">*</span></label>
                                                             <input type="text" class="form-control" id="productCode" name="barcode" placeholder="Enter barcode">
                                                         </div>
                                                     </div>
@@ -143,9 +143,15 @@ function autoDismissMessages() {
         });
     }, 5000); // 5 seconds
 }
-    
-// Product image preview
-$(document).ready(function () {
+
+// Barcode scanner detection variables
+let barcodeBuffer = '';
+let lastKeyTime = 0;
+let barcodeTimeoutId = null;
+let consecutiveKeysCount = 0;
+
+// Initialize on page load
+$(document).ready(function() {
     // Initialize Select2
     $('#category, #brand, #availability').select2({
         width: '100%'
@@ -156,6 +162,18 @@ $(document).ready(function () {
         setTimeout(() => {
             document.querySelector('.select2-search__field').focus();
         }, 100);
+    });
+
+    // Setup barcode detection for the entire page
+    setupBarcodeDetection();
+
+    // Clean up barcode event handlers when leaving the page
+    $(window).on('beforeunload', function() {
+        $(document).off('keydown.barcodeScanner');
+        if (barcodeTimeoutId) {
+            clearTimeout(barcodeTimeoutId);
+            barcodeTimeoutId = null;
+        }
     });
 
     // Check for duplicate product details
@@ -449,4 +467,90 @@ $(document).ready(function () {
         }).length > 0;
     }
 });
+
+// Create a dedicated barcode detection function
+function setupBarcodeDetection() {
+    console.log('Setting up barcode detection');
+    
+    // Listen for keyboard events anywhere in the document
+    $(document).on('keydown.barcodeScanner', function(e) {
+        const now = new Date().getTime();
+        const keyPressInterval = now - lastKeyTime;
+        lastKeyTime = now;
+        
+        // Handle printable characters (most barcode content)
+        if (e.key.length === 1) {
+            // Fast typing is characteristic of barcode scanners (typically under 50ms between keys)
+            if (keyPressInterval < 50) {
+                // Always prevent default action for fast keypresses
+                e.preventDefault();
+                
+                // Log the key being added (for debugging)
+                console.log('Adding to barcode buffer:', e.key, 'Current buffer:', barcodeBuffer);
+                
+                // Start or continue collecting the barcode
+                barcodeBuffer += e.key;
+                consecutiveKeysCount++;
+                
+                // Reset any previous timeout
+                if (barcodeTimeoutId) {
+                    clearTimeout(barcodeTimeoutId);
+                }
+                
+                // Process the barcode after a short pause in input
+                barcodeTimeoutId = setTimeout(function() {
+                    // Only process if we have enough characters to be a barcode
+                    if (barcodeBuffer.length >= 4) {
+                        console.log('Processing complete barcode:', barcodeBuffer);
+                        // Detailed log of the barcode contents
+                        console.log('Barcode details:', {
+                            value: barcodeBuffer,
+                            length: barcodeBuffer.length,
+                            firstChar: barcodeBuffer.charAt(0),
+                            charCodes: Array.from(barcodeBuffer).map(c => c.charCodeAt(0))
+                        });
+                        
+                        // Place the barcode in the target field and focus it
+                        $("#productCode").val(barcodeBuffer);
+                        $("#productCode").focus();
+                        $("#productCode").trigger('blur'); // Trigger duplicate check
+                    } else {
+                        console.log('Barcode too short, not processing:', barcodeBuffer);
+                    }
+                    
+                    // Reset state
+                    barcodeBuffer = '';
+                    consecutiveKeysCount = 0;
+                }, 250);
+            } else {
+                // If typing speed is normal human pace, reset the barcode buffer
+                console.log('Normal typing detected, resetting buffer');
+                barcodeBuffer = e.key; // Start fresh with this character
+                consecutiveKeysCount = 1;
+            }
+        } 
+        // Enter key often signals the end of a barcode scan
+        else if (e.key === 'Enter' && barcodeBuffer.length >= 4) {
+            // Prevent the Enter key from submitting the form
+            e.preventDefault();
+            
+            console.log('Enter key pressed, processing barcode:', barcodeBuffer);
+            console.log('Barcode details:', {
+                value: barcodeBuffer,
+                length: barcodeBuffer.length,
+                firstChar: barcodeBuffer.charAt(0),
+                charCodes: Array.from(barcodeBuffer).map(c => c.charCodeAt(0))
+            });
+            
+            // Place the barcode in the target field
+            $("#productCode").val(barcodeBuffer);
+            $("#productCode").focus();
+            $("#productCode").trigger('blur'); // Trigger duplicate check
+            
+            // Reset barcode state
+            barcodeBuffer = '';
+            consecutiveKeysCount = 0;
+        }
+    });
+}
 </script>

@@ -200,9 +200,59 @@ class Model_products extends CI_Model
 
 	public function countTotalProducts()
 	{
-		$sql = "SELECT * FROM products";
+		$sql = "SELECT COUNT(*) as total_products FROM products";
 		$query = $this->db->query($sql);
-		return $query->num_rows();
+		return $query->row()->total_products;
+	}
+
+	/**
+	 * Get product by barcode
+	 * Returns product data if barcode exists, null otherwise
+	 */
+	public function getProductByBarcode($barcode = null)
+	{
+		if($barcode) {
+			// Log the barcode lookup with additional detail
+			log_message('debug', 'Looking up product by barcode: "' . $barcode . '", Length: ' . strlen($barcode) . ', Type: ' . gettype($barcode));
+			
+			// Cast the barcode to string to ensure consistent comparison
+			$barcode = (string)$barcode;
+			
+			// Use the query builder with a direct comparison
+			$this->db->where('barcode', $barcode);
+			$query = $this->db->get('products');
+			
+			// Log the SQL query that was executed
+			log_message('debug', 'SQL query: ' . $this->db->last_query());
+			
+			// Return the product data if found
+			if($query->num_rows() == 1) {
+				log_message('debug', 'Product found for barcode: "' . $barcode . '"');
+				return $query->row_array();
+			}
+			
+			// If no exact match found, try a LIKE search as a fallback
+			$this->db->like('barcode', $barcode);
+			$query = $this->db->get('products');
+			
+			log_message('debug', 'Fallback LIKE query: ' . $this->db->last_query());
+			log_message('debug', 'Fallback query rows: ' . $query->num_rows());
+			
+			if($query->num_rows() == 1) {
+				log_message('debug', 'Product found for barcode via LIKE search');
+				return $query->row_array();
+			} else if($query->num_rows() > 1) {
+				log_message('debug', 'Multiple products found for barcode via LIKE search, using first match');
+				return $query->row_array();
+			}
+			
+			log_message('debug', 'No product found for barcode: "' . $barcode . '"');
+			return false;
+		}
+		
+		// If no barcode provided, log and return false
+		log_message('error', 'getProductByBarcode called with no barcode parameter');
+		return false;
 	}
 
 }
