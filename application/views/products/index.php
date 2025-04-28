@@ -34,6 +34,7 @@
                                 <?php if(in_array('updateProduct', $user_permission) || in_array('deleteProduct', $user_permission)): ?>
                                 <button type="button" class="btn btn-danger dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" id="actionsBtn" style="display: none"><i class="ti ti-settings me-1"></i> Actions <span class="caret"></span></button>
                                   <div class="dropdown-menu" style="">
+                                    <a class="dropdown-item view-item" href="#"><i class="ti ti-eye"></i> &nbsp;View</a>
                                     <?php if(in_array('updateProduct', $user_permission)): ?>
                                      <a class="dropdown-item edit-item" href="#"><i class="ti ti-edit"></i> &nbsp;Edit</a>
                                     <?php endif; ?>
@@ -445,7 +446,80 @@
         </div>
     </div>
 
+    <!-- Product Info Modal -->
+    <div id="productInfoModal" class="modal fade" tabindex="-1" role="dialog">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header text-bg-dark">
+                    <h4 class="modal-title">Product Information</h4>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="text-center mb-4">
+                        <img id="info_product_image" src="<?php echo base_url('assets/images/product_images/no-image.jpg'); ?>" class="img-fluid rounded-3 shadow-sm" style="max-width: 180px;">
+                    </div>
+                    <div class="product-info">
+                        <h5 id="info_product_name" class="text-center mb-4 fw-bold"></h5>
+                        <div class="row g-3">
+                            <div class="col-6">
+                                <div class="border rounded-3 p-3 h-100">
+                                    <small class="text-muted d-block">SKU</small>
+                                    <span id="info_sku" class="fw-medium"></span>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="border rounded-3 p-3 h-100">
+                                    <small class="text-muted d-block">Barcode</small>
+                                    <span id="info_barcode" class="fw-medium"></span>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="border rounded-3 p-3 h-100">
+                                    <small class="text-muted d-block">Category</small>
+                                    <span id="info_category" class="fw-medium"></span>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="border rounded-3 p-3 h-100">
+                                    <small class="text-muted d-block">Brand</small>
+                                    <span id="info_brand" class="fw-medium"></span>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="border rounded-3 p-3 h-100">
+                                    <small class="text-muted d-block">Price</small>
+                                    <span id="info_price" class="fw-medium"></span>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="border rounded-3 p-3 h-100">
+                                    <small class="text-muted d-block">Quantity</small>
+                                    <span id="info_quantity" class="fw-medium"></span>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <div class="border rounded-3 p-3">
+                                    <small class="text-muted d-block">Status</small>
+                                    <span id="info_status"></span>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <div class="border rounded-3 p-3">
+                                    <small class="text-muted d-block">Description</small>
+                                    <span id="info_description" class="fw-medium"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
 <script>
+// Define global variables for products.js
+var base_url = "<?php echo base_url(); ?>";
+
 // Function to auto-dismiss messages
 function autoDismissMessages() {
     setTimeout(function() {
@@ -1050,7 +1124,8 @@ function updateActionsButton() {
     // Show/hide the actions button
     actionsBtn.toggle(anyChecked);
     
-    // Show/hide the edit option based on number of selections
+    // Show/hide the view and edit options based on number of selections
+    $('.view-item').toggle(checkedCount === 1);
     $('.edit-item').toggle(checkedCount === 1);
 }
 
@@ -1224,7 +1299,6 @@ $('.dropdown-menu .dropdown-item').click(function(e) {
                 success: function(response) {
                     if(response.success) {
                         let product = response.data;
-                        console.log("Product data received:", product);
                         
                         // Populate the edit form with product data
                         $('#edit_product_id').val(product.id);
@@ -1412,6 +1486,167 @@ $('#removeForm').on('submit', function(e) {
         }
     });
 });
+
+// Function to handle barcode lookup
+function handleBarcodeLookup(barcode) {
+    $.ajax({
+        url: "<?php echo base_url('products/barcode_lookup'); ?>",
+        type: 'GET',
+        data: { barcode: barcode },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                showProductInfo(response.data);
+            } else {
+                $('#messages').html(`
+                    <div class="alert alert-warning text-bg-warning alert-dismissible d-flex align-items-center" role="alert">
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+                        <iconify-icon icon="solar:danger-triangle-bold-duotone" class="fs-20 me-1"></iconify-icon>
+                        <div class="lh-1">No product found with barcode: ${barcode}</div>
+                    </div>
+                `);
+                autoDismissMessages();
+            }
+        },
+        error: function() {
+            $('#messages').html(`
+                <div class="alert alert-danger text-bg-danger alert-dismissible d-flex align-items-center" role="alert">
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+                    <iconify-icon icon="solar:danger-triangle-bold-duotone" class="fs-20 me-1"></iconify-icon>
+                    <div class="lh-1">Error looking up product. Please try again.</div>
+                </div>
+            `);
+            autoDismissMessages();
+        }
+    });
+}
+
+// Function to show product info in modal
+function showProductInfo(product) {
+    // Update image
+    if (product.image) {
+        $('#info_product_image').attr('src', product.image);
+    } else {
+        $('#info_product_image').attr('src', base_url + 'assets/images/product_images/no-image.jpg');
+    }
+    
+    // Update text fields
+    $('#info_product_name').text(product.name);
+    $('#info_sku').text(product.sku);
+    $('#info_barcode').text(product.barcode);
+    $('#info_category').text(product.category_name);
+    $('#info_brand').text(product.brand_name);
+    $('#info_price').text('₱' + parseFloat(product.price).toFixed(2));
+    $('#info_quantity').text(product.qty);
+    $('#info_description').text(product.description || 'No description available');
+    
+    // Set status with appropriate styling
+    let statusHtml = '';
+    if (product.availability == 1) {
+        statusHtml = '<span class="badge bg-success">Available</span>';
+    } else if (product.availability == 0) {
+        statusHtml = '<span class="badge bg-danger">Out of Stock</span>';
+    } else {
+        statusHtml = '<span class="badge bg-secondary">Discontinued</span>';
+    }
+    $('#info_status').html(statusHtml);
+    
+    // Show the modal
+    $('#productInfoModal').modal('show');
+}
+
+// Global barcode scanner detection
+$(document).on('keydown', function(e) {
+    // Only process if no modal is open or if the add product modal is open
+    if ($('.modal.show').length === 0 || $('#addProductModal').hasClass('show')) {
+        const now = new Date().getTime();
+        const keyPressInterval = now - lastKeyTime;
+        lastKeyTime = now;
+        
+        // Handle printable characters
+        if (e.key.length === 1) {
+            if (keyPressInterval < 50) {
+                barcodeBuffer += e.key;
+                consecutiveKeysCount++;
+                
+                if (barcodeTimeoutId) {
+                    clearTimeout(barcodeTimeoutId);
+                }
+                
+                barcodeTimeoutId = setTimeout(function() {
+                    if (barcodeBuffer.length >= 4) {
+                        if ($('#addProductModal').hasClass('show')) {
+                            // If add product modal is open, put barcode in the input
+                            $("#productCode").val(barcodeBuffer);
+                            $("#productCode").focus();
+                            $("#productCode").trigger('blur');
+                        } else {
+                            // Otherwise, look up the product
+                            handleBarcodeLookup(barcodeBuffer);
+                        }
+                    }
+                    barcodeBuffer = '';
+                    consecutiveKeysCount = 0;
+                }, 250);
+            } else {
+                barcodeBuffer = e.key;
+                consecutiveKeysCount = 1;
+            }
+        } 
+        // Handle Enter key
+        else if (e.key === 'Enter' && barcodeBuffer.length >= 4) {
+            if ($('#addProductModal').hasClass('show')) {
+                $("#productCode").val(barcodeBuffer);
+                $("#productCode").focus();
+                $("#productCode").trigger('blur');
+            } else {
+                handleBarcodeLookup(barcodeBuffer);
+            }
+            barcodeBuffer = '';
+            consecutiveKeysCount = 0;
+            e.preventDefault();
+        }
+    }
+});
+
+// Handle view action from dropdown
+$('.dropdown-menu').on('click', '.view-item', function(e) {
+    e.preventDefault();
+    if(selectedProductIds.length === 1) {
+        const productId = selectedProductIds[0];
+        
+        $.ajax({
+            url: "<?php echo base_url('products/get_product'); ?>",
+            type: "POST",
+            data: { product_id: productId },
+            dataType: "json",
+            success: function(response) {
+                if(response.success) {
+                    showProductInfo(response.data);
+                } else {
+                    $('#messages').html(`
+                        <div class="alert alert-danger text-bg-danger alert-dismissible d-flex align-items-center" role="alert">
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+                            <iconify-icon icon="solar:danger-triangle-bold-duotone" class="fs-20 me-1"></iconify-icon>
+                            <div class="lh-1">${response.message}</div>
+                        </div>
+                    `);
+                    autoDismissMessages();
+                }
+            },
+            error: function() {
+                $('#messages').html(`
+                    <div class="alert alert-danger text-bg-danger alert-dismissible d-flex align-items-center" role="alert">
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+                        <iconify-icon icon="solar:danger-triangle-bold-duotone" class="fs-20 me-1"></iconify-icon>
+                        <div class="lh-1">Error fetching product details. Please try again.</div>
+                    </div>
+                `);
+                autoDismissMessages();
+            }
+        });
+    }
+});
 });
 
 // Search functionality
@@ -1525,5 +1760,3 @@ function setupBarcodeDetection(modalElement, targetField) {
 setupBarcodeDetection('#addProductModal', '#productCode');
 setupBarcodeDetection('#editProductModal', '#edit_productCode');
 </script>
-
-

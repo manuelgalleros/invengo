@@ -253,17 +253,38 @@ function loadBrandTable(page = 1, search = '') {
                 let totalPages = Math.ceil(total / 10);
                 
                 if (totalPages > 1) {
+                    // First page button
+                    paginationHtml += `
+                        <li class="page-item ${page <= 1 ? 'disabled' : ''}">
+                            <a class="page-link" href="javascript:void(0);" onclick="loadBrandTable(1, '${search}')">
+                                <i class="ti ti-chevrons-left"></i>
+                            </a>
+                        </li>
+                    `;
+                    
                     // Previous button
                     paginationHtml += `
                         <li class="page-item ${page <= 1 ? 'disabled' : ''}">
                             <a class="page-link" href="javascript:void(0);" onclick="loadBrandTable(${page - 1}, '${search}')">
-                                <i class="ti ti-chevron-left"></i>
+                                Previous
                             </a>
                         </li>
                     `;
                     
                     // Page numbers
-                    for(let i = 1; i <= totalPages; i++) {
+                    let startPage = Math.max(1, page - 2);
+                    let endPage = Math.min(totalPages, page + 2);
+                    
+                    // Ensure we always show 5 pages if possible
+                    if (endPage - startPage < 4) {
+                        if (startPage === 1) {
+                            endPage = Math.min(5, totalPages);
+                        } else if (endPage === totalPages) {
+                            startPage = Math.max(1, totalPages - 4);
+                        }
+                    }
+                    
+                    for(let i = startPage; i <= endPage; i++) {
                         paginationHtml += `
                             <li class="page-item ${i === parseInt(page) ? 'active' : ''}">
                                 <a class="page-link" href="javascript:void(0);" onclick="loadBrandTable(${i}, '${search}')">${i}</a>
@@ -275,7 +296,16 @@ function loadBrandTable(page = 1, search = '') {
                     paginationHtml += `
                         <li class="page-item ${page >= totalPages ? 'disabled' : ''}">
                             <a class="page-link" href="javascript:void(0);" onclick="loadBrandTable(${page + 1}, '${search}')">
-                                <i class="ti ti-chevron-right"></i>
+                                Next
+                            </a>
+                        </li>
+                    `;
+                    
+                    // Last page button
+                    paginationHtml += `
+                        <li class="page-item ${page >= totalPages ? 'disabled' : ''}">
+                            <a class="page-link" href="javascript:void(0);" onclick="loadBrandTable(${totalPages}, '${search}')">
+                                <i class="ti ti-chevrons-right"></i>
                             </a>
                         </li>
                     `;
@@ -491,7 +521,7 @@ $(document).ready(function() {
                     $('#messages').html(`
                         <div class="alert alert-danger text-bg-danger alert-dismissible d-flex align-items-center">
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
-                            <iconify-icon icon="solar:danger-triangle-line-duotone" class="fs-20 me-1"></iconify-icon>
+                            <iconify-icon icon="solar:danger-triangle-bold-duotone" class="fs-20 me-1"></iconify-icon>
                             <div class="lh-1">${response.messages}</div>
                         </div>
                     `);
@@ -509,7 +539,7 @@ $(document).ready(function() {
                 $('#messages').html(`
                     <div class="alert alert-danger text-bg-danger alert-dismissible d-flex align-items-center">
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
-                        <iconify-icon icon="solar:danger-triangle-line-duotone" class="fs-20 me-1"></iconify-icon>
+                        <iconify-icon icon="solar:danger-triangle-bold-duotone" class="fs-20 me-1"></iconify-icon>
                         <div class="lh-1">An error occurred while processing your request.</div>
                     </div>
                 `);

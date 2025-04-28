@@ -893,16 +893,34 @@ function loadUserTable(page = 1, search = '') {
         // Always show pagination container
         $(".pagination").show();
         
+        // First page button
+        paginationHtml += '<li class="page-item' + (page <= 1 ? ' disabled' : '') + '"><a class="page-link" href="javascript:void(0);" onclick="loadUserTable(' + 1 + ', \'' + search + '\')"><i class="ti ti-chevrons-left"></i></a></li>';
+        
         // Previous button
         paginationHtml += '<li class="page-item' + (page <= 1 ? ' disabled' : '') + '"><a class="page-link" href="javascript:void(0);" onclick="loadUserTable(' + (page - 1) + ', \'' + search + '\')">Previous</a></li>';
         
         // Page numbers
-        for(let i = 1; i <= totalPages; i++) {
+        let startPage = Math.max(1, page - 2);
+        let endPage = Math.min(totalPages, page + 2);
+        
+        // Ensure we always show 5 pages if possible
+        if (endPage - startPage < 4) {
+          if (startPage === 1) {
+            endPage = Math.min(5, totalPages);
+          } else if (endPage === totalPages) {
+            startPage = Math.max(1, totalPages - 4);
+          }
+        }
+        
+        for(let i = startPage; i <= endPage; i++) {
           paginationHtml += '<li class="page-item' + (i === parseInt(page) ? ' active' : '') + '"><a class="page-link" href="javascript:void(0);" onclick="loadUserTable(' + i + ', \'' + search + '\')">' + i + '</a></li>';
         }
         
         // Next button
         paginationHtml += '<li class="page-item' + (page >= totalPages ? ' disabled' : '') + '"><a class="page-link" href="javascript:void(0);" onclick="loadUserTable(' + (page + 1) + ', \'' + search + '\')">Next</a></li>';
+        
+        // Last page button
+        paginationHtml += '<li class="page-item' + (page >= totalPages ? ' disabled' : '') + '"><a class="page-link" href="javascript:void(0);" onclick="loadUserTable(' + totalPages + ', \'' + search + '\')"><i class="ti ti-chevrons-right"></i></a></li>';
         
         $(".pagination").html(paginationHtml);
         $("#userFooter").show();

@@ -93,6 +93,7 @@
                         </div><!-- end row -->
 
                         <!-- Monthly Earnings Chart -->
+                        <?php if(in_array('viewReports', $user_permission)): ?>
                         <div class="row">
                             <div class="col-xxl-8 col-xl-7 col-lg-7">
                                 <div class="card">
@@ -117,8 +118,10 @@
                                 </div>
                             </div>
                         </div>
+                        <?php endif; ?>
                         
                         <!-- Recent Activity -->
+                        <?php if(in_array('viewLog', $user_permission)): ?>
                         <div class="row">
                             <div class="col-12">
                                 <div class="card">
@@ -170,6 +173,7 @@
                                 </div>
                             </div>
                         </div>
+                        <?php endif; ?>
 
                     </div> <!-- container -->
 
@@ -178,6 +182,7 @@
             $("#nav-item-dashboard").addClass('active');
             $("#nav-link-dashboard").addClass('active');
             
+            <?php if(in_array('viewReports', $user_permission)): ?>
             // Initialize Monthly Earnings Chart
             var monthlyOptions = {
                 chart: {
@@ -263,6 +268,7 @@
                 categoryOptions
             );
             categorychart.render();
+            <?php endif; ?>
           }); 
          </script>
 

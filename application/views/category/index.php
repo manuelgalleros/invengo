@@ -236,6 +236,8 @@ function loadCategoryTable(page = 1, search = '') {
         },
         dataType: "json",
         success: function(response) {
+            console.log("API Response:", response);
+            
             if(response.data && response.data.length > 0) {
                 let tableHtml = '';
                 response.data.forEach(function(row) {
@@ -252,54 +254,91 @@ function loadCategoryTable(page = 1, search = '') {
                 });
                 $("#categoryBody").html(tableHtml);
                 $("#categoryTableHead").fadeIn();
+                $("#pagination-status, .pagination").fadeIn();
                 
-                // Update pagination status
-                const start = (page - 1) * response.pagination.limit + 1;
-                const end = Math.min(start + response.data.length - 1, response.pagination.total_records);
+                // Calculate total pages
+                let total = response.pagination.total_records;
+                let totalPages = Math.ceil(total / 10);
                 
-                $("#pagination-status").html(`
-                    Showing ${start} to ${end} of ${response.pagination.total_records} categories
-                `).fadeIn();
-
-                // Generate pagination
-                let paginationHtml = '';
-                
-                // Always show pagination
-                paginationHtml += `
-                    <li class="page-item ${page <= 1 ? 'disabled' : ''}">
-                        <a class="page-link" href="javascript:void(0);" onclick="loadCategoryTable(${page - 1}, '${search}')">
-                            Previous
-                        </a>
-                    </li>
-                `;
-                
-                // Page numbers
-                for(let i = 1; i <= response.pagination.total_pages; i++) {
+                if (totalPages > 0) {
+                    let paginationHtml = '';
+                    
+                    // First page button
                     paginationHtml += `
-                        <li class="page-item ${i === parseInt(page) ? 'active' : ''}">
-                            <a class="page-link" href="javascript:void(0);" onclick="loadCategoryTable(${i}, '${search}')">${i}</a>
+                        <li class="page-item ${page <= 1 ? 'disabled' : ''}">
+                            <a class="page-link" href="javascript:void(0);" onclick="loadCategoryTable(1, '${search}')">
+                                <i class="ti ti-chevrons-left"></i> First
+                            </a>
                         </li>
                     `;
+                    
+                    // Previous button
+                    paginationHtml += `
+                        <li class="page-item ${page <= 1 ? 'disabled' : ''}">
+                            <a class="page-link" href="javascript:void(0);" onclick="loadCategoryTable(${page - 1}, '${search}')">
+                                Previous
+                            </a>
+                        </li>
+                    `;
+                    
+                    // Page numbers
+                    let startPage = Math.max(1, page - 2);
+                    let endPage = Math.min(totalPages, page + 2);
+                    
+                    // Ensure we always show 5 pages if possible
+                    if (endPage - startPage < 4) {
+                        if (startPage === 1) {
+                            endPage = Math.min(5, totalPages);
+                        } else if (endPage === totalPages) {
+                            startPage = Math.max(1, totalPages - 4);
+                        }
+                    }
+                    
+                    for(let i = startPage; i <= endPage; i++) {
+                        paginationHtml += `
+                            <li class="page-item ${i === parseInt(page) ? 'active' : ''}">
+                                <a class="page-link" href="javascript:void(0);" onclick="loadCategoryTable(${i}, '${search}')">${i}</a>
+                            </li>
+                        `;
+                    }
+                    
+                    // Next button
+                    paginationHtml += `
+                        <li class="page-item ${page >= totalPages ? 'disabled' : ''}">
+                            <a class="page-link" href="javascript:void(0);" onclick="loadCategoryTable(${page + 1}, '${search}')">
+                                Next
+                            </a>
+                        </li>
+                    `;
+                    
+                    // Last page button
+                    paginationHtml += `
+                        <li class="page-item ${page >= totalPages ? 'disabled' : ''}">
+                            <a class="page-link" href="javascript:void(0);" onclick="loadCategoryTable(${totalPages}, '${search}')">
+                                Last <i class="ti ti-chevrons-right"></i>
+                            </a>
+                        </li>
+                    `;
+                    
+                    // Update pagination and status
+                    $(".pagination").html(paginationHtml).fadeIn();
+                    
+                    // Update pagination status
+                    let start = ((page - 1) * 10) + 1;
+                    let end = Math.min(start + response.data.length - 1, total);
+                    $("#pagination-status").html(`Showing ${start} to ${end} of ${total} categories`).fadeIn();
+                } else {
+                    $(".pagination").hide();
+                    $("#pagination-status").html('Showing 0 to 0 of 0 categories').fadeIn();
                 }
-                
-                // Next button
-                paginationHtml += `
-                    <li class="page-item ${page >= response.pagination.total_pages ? 'disabled' : ''}">
-                        <a class="page-link" href="javascript:void(0);" onclick="loadCategoryTable(${page + 1}, '${search}')">
-                            Next
-                        </a>
-                    </li>
-                `;
-                
-                $(".pagination").html(paginationHtml).fadeIn();
             } else {
                 $("#categoryBody").html(`
                     <tr>
                         <td colspan="3" class="text-center">No categories found</td>
                     </tr>
                 `);
+                $(".pagination").hide();
                 $("#pagination-status").html('Showing 0 to 0 of 0 categories').fadeIn();
-                $(".pagination").html('').fadeIn();
             }
             
             $("#showCategoriesBtn").hide();
@@ -315,8 +354,7 @@ function loadCategoryTable(page = 1, search = '') {
                     <td colspan="3" class="text-center text-danger">Failed to load categories</td>
                 </tr>
             `);
-            $("#pagination-status").html('Showing 0 to 0 of 0 categories').fadeIn();
-            $(".pagination").html('').fadeIn();
+            $("#pagination-status, .pagination").hide();
         }
     });
 }
@@ -489,7 +527,7 @@ $(document).ready(function() {
                     $('#messages').html(`
                         <div class="alert alert-danger text-bg-danger alert-dismissible d-flex align-items-center">
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
-                            <iconify-icon icon="solar:danger-triangle-line-duotone" class="fs-20 me-1"></iconify-icon>
+                            <iconify-icon icon="solar:danger-triangle-bold-duotone" class="fs-20 me-1"></iconify-icon>
                             <div class="lh-1">${response.messages}</div>
                         </div>
                     `);
@@ -507,7 +545,7 @@ $(document).ready(function() {
                 $('#messages').html(`
                     <div class="alert alert-danger text-bg-danger alert-dismissible d-flex align-items-center">
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
-                        <iconify-icon icon="solar:danger-triangle-line-duotone" class="fs-20 me-1"></iconify-icon>
+                        <iconify-icon icon="solar:danger-triangle-bold-duotone" class="fs-20 me-1"></iconify-icon>
                         <div class="lh-1">An error occurred while processing your request.</div>
                     </div>
                 `);

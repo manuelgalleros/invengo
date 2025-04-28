@@ -324,9 +324,9 @@ $(document).ready(function() {
             $('#quantity').addClass('is-invalid');
             $('#quantity').after('<div class="error-message text-danger small mt-1">Quantity is required</div>');
             isValid = false;
-        } else if (isNaN(parseInt(quantity)) || parseInt(quantity) < 0 || quantity.indexOf('.') !== -1) {
+        } else if (isNaN(parseInt(quantity)) || parseInt(quantity) <= 0 || quantity.indexOf('.') !== -1) {
             $('#quantity').addClass('is-invalid');
-            $('#quantity').after('<div class="error-message text-danger small mt-1">Quantity must be a valid number</div>');
+            $('#quantity').after('<div class="error-message text-danger small mt-1">Quantity must be a positive number greater than 0</div>');
             isValid = false;
         }
         

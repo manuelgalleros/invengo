@@ -677,7 +677,7 @@ class Products extends Admin_Controller
             if(!empty($image_path) && $image_path !== 'no-image.jpg') {
                 $image_path = base_url() . $image_path;
             } else {
-                $image_path = base_url() . 'assets/images/product_images/no-image.jpg';
+                $image_path = 'assets/images/product_images/no-image.jpg';
             }
 
             echo json_encode([
