@@ -448,69 +448,64 @@
 
     <!-- Product Info Modal -->
     <div id="productInfoModal" class="modal fade" tabindex="-1" role="dialog">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header text-bg-dark">
-                    <h4 class="modal-title">Product Information</h4>
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-primary text-white border-0">
+                    <h4 class="modal-title" id="info_product_name_title">Product Information</h4>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body p-4">
-                    <div class="text-center mb-4">
-                        <img id="info_product_image" src="<?php echo base_url('assets/images/product_images/no-image.jpg'); ?>" class="img-fluid rounded-3 shadow-sm" style="max-width: 180px;">
-                    </div>
-                    <div class="product-info">
-                        <h5 id="info_product_name" class="text-center mb-4 fw-bold"></h5>
-                        <div class="row g-3">
-                            <div class="col-6">
-                                <div class="border rounded-3 p-3 h-100">
-                                    <small class="text-muted d-block">SKU</small>
-                                    <span id="info_sku" class="fw-medium"></span>
+                <div class="modal-body p-0">
+                    <div class="d-flex">
+                        <div class="p-3 border-end" style="width: 140px;">
+                            <img id="info_product_image" src="<?php echo base_url('assets/images/product_images/no-image.jpg'); ?>" 
+                                class="img-fluid rounded-3" alt="Product Image">
+                        </div>
+                        <div class="flex-grow-1 p-3">
+                            <h5 id="info_product_name" class="fw-bold mb-2 text-primary"></h5>
+                            
+                            <div class="mb-3">
+                                <span id="info_status" class="me-2"></span>
+                                <span class="badge bg-secondary-subtle text-secondary rounded-pill">
+                                    SKU: <span id="info_sku" class="fw-medium"></span>
+                                </span>
+                            </div>
+                            
+                            <div class="d-flex gap-3 mb-2">
+                                <div>
+                                    <div class="text-muted small">Price</div>
+                                    <div id="info_price" class="fw-bold text-success"></div>
+                                </div>
+                                <div>
+                                    <div class="text-muted small">Quantity</div>
+                                    <div id="info_quantity" class="fw-bold"></div>
                                 </div>
                             </div>
-                            <div class="col-6">
-                                <div class="border rounded-3 p-3 h-100">
-                                    <small class="text-muted d-block">Barcode</small>
-                                    <span id="info_barcode" class="fw-medium"></span>
+                            
+                            <div class="d-flex gap-3 mb-3">
+                                <div>
+                                    <div class="text-muted small">Category</div>
+                                    <div id="info_category" class=""></div>
+                                </div>
+                                <div>
+                                    <div class="text-muted small">Brand</div>
+                                    <div id="info_brand" class=""></div>
                                 </div>
                             </div>
-                            <div class="col-6">
-                                <div class="border rounded-3 p-3 h-100">
-                                    <small class="text-muted d-block">Category</small>
-                                    <span id="info_category" class="fw-medium"></span>
-                                </div>
-                            </div>
-                            <div class="col-6">
-                                <div class="border rounded-3 p-3 h-100">
-                                    <small class="text-muted d-block">Brand</small>
-                                    <span id="info_brand" class="fw-medium"></span>
-                                </div>
-                            </div>
-                            <div class="col-6">
-                                <div class="border rounded-3 p-3 h-100">
-                                    <small class="text-muted d-block">Price</small>
-                                    <span id="info_price" class="fw-medium"></span>
-                                </div>
-                            </div>
-                            <div class="col-6">
-                                <div class="border rounded-3 p-3 h-100">
-                                    <small class="text-muted d-block">Quantity</small>
-                                    <span id="info_quantity" class="fw-medium"></span>
-                                </div>
-                            </div>
-                            <div class="col-12">
-                                <div class="border rounded-3 p-3">
-                                    <small class="text-muted d-block">Status</small>
-                                    <span id="info_status"></span>
-                                </div>
-                            </div>
-                            <div class="col-12">
-                                <div class="border rounded-3 p-3">
-                                    <small class="text-muted d-block">Description</small>
-                                    <span id="info_description" class="fw-medium"></span>
-                                </div>
+                            
+                            <div class="mb-1">
+                                <div class="text-muted small">Barcode</div>
+                                <div id="info_barcode" class="font-monospace"></div>
                             </div>
                         </div>
                     </div>
+                    
+                    <div class="border-top p-3">
+                        <div class="text-muted small mb-1">Description</div>
+                        <div id="info_description" class=""></div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-0">
+                    <button type="button" class="btn btn-sm btn-info" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
@@ -1523,7 +1518,42 @@ function handleBarcodeLookup(barcode) {
 
 // Function to show product info in modal
 function showProductInfo(product) {
-    // Update image
+    // If we have a product ID, fetch complete data from the database
+    if (product.id) {
+        $.ajax({
+            url: "<?php echo base_url('products/get_product'); ?>",
+            type: "POST",
+            data: { product_id: product.id },
+            dataType: "json",
+            success: function(response) {
+                if (response.success) {
+                    // Use the complete data from the server
+                    updateProductInfoModal(response.data);
+                } else {
+                    // If API call fails, use the data we already have
+                    updateProductInfoModal(product);
+                    console.warn("Could not fetch complete product data:", response.message);
+                }
+            },
+            error: function() {
+                // If AJAX fails, use the data we already have
+                updateProductInfoModal(product);
+                console.warn("Error fetching complete product data");
+            }
+        });
+    } else {
+        // If no product ID, just use the data we have
+        updateProductInfoModal(product);
+    }
+}
+
+// Helper function to update modal with product data
+function updateProductInfoModal(product) {
+    // Update basic product info immediately
+    $('#info_product_name_title').text(product.name);
+    $('#info_product_name').text(product.name);
+    
+    // Update image with proper fallback
     if (product.image) {
         $('#info_product_image').attr('src', product.image);
     } else {
@@ -1531,13 +1561,17 @@ function showProductInfo(product) {
     }
     
     // Update text fields
-    $('#info_product_name').text(product.name);
-    $('#info_sku').text(product.sku);
-    $('#info_barcode').text(product.barcode);
-    $('#info_category').text(product.category_name);
-    $('#info_brand').text(product.brand_name);
+    $('#info_sku').text(product.sku || 'N/A');
+    $('#info_barcode').text(product.barcode || 'N/A');
+    
+    // Price formatting
     $('#info_price').text('₱' + parseFloat(product.price).toFixed(2));
-    $('#info_quantity').text(product.qty);
+    
+    // Fix quantity field - check all possible property names
+    const quantity = product.quantity || product.qty || 0;
+    $('#info_quantity').text(quantity + ' unit' + (quantity != 1 ? 's' : ''));
+    
+    // Set description with fallback
     $('#info_description').text(product.description || 'No description available');
     
     // Set status with appropriate styling
@@ -1551,8 +1585,73 @@ function showProductInfo(product) {
     }
     $('#info_status').html(statusHtml);
     
-    // Show the modal
+    // Show the modal immediately, we'll update category/brand as they load
     $('#productInfoModal').modal('show');
+    
+    // Set default placeholders while loading
+    $('#info_category').text('Loading...');
+    $('#info_brand').text('Loading...');
+    
+    // Track pending requests to properly handle async updates
+    let pendingRequests = 0;
+    
+    // Fetch category name if needed
+    if (product.category_name) {
+        $('#info_category').text(product.category_name);
+    } else if (product.category_id || product.category) {
+        pendingRequests++;
+        const categoryId = product.category_id || product.category;
+        $.ajax({
+            url: "<?php echo base_url('category/fetchCategoryDataById'); ?>",
+            type: "POST",
+            data: { category_id: categoryId },
+            dataType: "json",
+            success: function(response) {
+                // The response is a direct object with {id, name, active} format
+                if (response && response.name) {
+                    $('#info_category').text(response.name);
+                } else {
+                    $('#info_category').text('Uncategorized');
+                }
+                pendingRequests--;
+            },
+            error: function() {
+                $('#info_category').text('Uncategorized');
+                pendingRequests--;
+            }
+        });
+    } else {
+        $('#info_category').text('Uncategorized');
+    }
+    
+    // Fetch brand name if needed
+    if (product.brand_name) {
+        $('#info_brand').text(product.brand_name);
+    } else if (product.brand_id || product.brand) {
+        pendingRequests++;
+        const brandId = product.brand_id || product.brand;
+        $.ajax({
+            url: "<?php echo base_url('brands/fetchBrandDataById'); ?>",
+            type: "POST",
+            data: { brand_id: brandId },
+            dataType: "json",
+            success: function(response) {
+                // The response is a direct object with {id, name, active} format
+                if (response && response.name) {
+                    $('#info_brand').text(response.name);
+                } else {
+                    $('#info_brand').text('No Brand');
+                }
+                pendingRequests--;
+            },
+            error: function() {
+                $('#info_brand').text('No Brand');
+                pendingRequests--;
+            }
+        });
+    } else {
+        $('#info_brand').text('No Brand');
+    }
 }
 
 // Global barcode scanner detection
@@ -1679,84 +1778,129 @@ function hasDuplicateErrors() {
 let barcodeBuffer = '';
 let lastKeyTime = 0;
 let barcodeTimeoutId = null;
-let consecutiveKeysCount = 0;
+let isBarcodeMode = false;
 
-// Create a dedicated barcode detection function
-function setupBarcodeDetection(modalElement, targetField) {
-    $(modalElement).on('shown.bs.modal', function() {
-        // Listen for keyboard events anywhere in the document
-        $(document).on('keydown.barcodeScanner', function(e) {
-            const now = new Date().getTime();
-            const keyPressInterval = now - lastKeyTime;
-            lastKeyTime = now;
-            
-            // Handle printable characters (most barcode content)
-            if (e.key.length === 1) {
-                // Fast typing is characteristic of barcode scanners (typically under 50ms between keys)
-                if (keyPressInterval < 50) {
-                    // If this is the start of what might be a barcode scan
-                    // or we're already collecting a barcode, prevent default action
-                    if (barcodeBuffer.length >= 0) {
-                        e.preventDefault();
-                    }
-                    
-                    // Start or continue collecting the barcode
-                    barcodeBuffer += e.key;
-                    consecutiveKeysCount++;
-                    
-                    // Reset any previous timeout
-                    if (barcodeTimeoutId) {
-                        clearTimeout(barcodeTimeoutId);
-                    }
-                    
-                    // Process the barcode after a short pause in input
-                    barcodeTimeoutId = setTimeout(function() {
-                        // Only process if we have enough characters to be a barcode
-                        if (barcodeBuffer.length >= 4) {
-                            // Place the barcode in the target field and focus it
-                            $(targetField).val(barcodeBuffer);
-                            $(targetField).focus();
-                        }
-                        
-                        // Reset state
-                        barcodeBuffer = '';
-                        consecutiveKeysCount = 0;
-                    }, 250);
-                } else {
-                    // If typing speed is normal human pace, reset the barcode buffer
-                    barcodeBuffer = e.key; // Start fresh with this character
-                    consecutiveKeysCount = 1;
-                }
-            } 
-            // Enter key often signals the end of a barcode scan
-            else if (e.key === 'Enter' && barcodeBuffer.length >= 4) {
-                $(targetField).val(barcodeBuffer);
-                $(targetField).focus();
-                
-                // Prevent the Enter key from submitting the form
-                e.preventDefault();
-                
-                // Reset barcode state
-                barcodeBuffer = '';
-                consecutiveKeysCount = 0;
-            }
-        });
-    });
-    
-    // Clean up event handlers when modal is closed
-    $(modalElement).on('hidden.bs.modal', function() {
-        $(document).off('keydown.barcodeScanner');
-        barcodeBuffer = '';
-        consecutiveKeysCount = 0;
-        
-        if (barcodeTimeoutId) {
-            clearTimeout(barcodeTimeoutId);
-            barcodeTimeoutId = null;
-        }
-    });
+// Remove all event handlers first to make sure there are no duplicates
+function removeAllBarcodeHandlers() {
+    $(document).off('keydown.barcodeScanner');
+    $(document).off('keydown.globalBarcodeScanner');
+    if (barcodeTimeoutId) {
+        clearTimeout(barcodeTimeoutId);
+        barcodeTimeoutId = null;
+    }
+    barcodeBuffer = '';
+    isBarcodeMode = false;
 }
 
-// Set up barcode detection for both modals
-setupBarcodeDetection('#addProductModal', '#productCode');
-setupBarcodeDetection('#editProductModal', '#edit_productCode');
+// We're taking a completely different approach now
+// Instead of using event handlers, we'll use a direct input replacement function
+$('#addProductModal').on('shown.bs.modal', function() {
+    // Remove old handlers first
+    removeAllBarcodeHandlers();
+    
+    console.log('Creating fresh barcode handler for Add Product modal');
+    
+    // Create a direct input field wrapper that will prevent character doubling
+    const originalInput = document.getElementById('productCode');
+    
+    // Disable direct input to the field
+    $('#productCode').attr('readonly', true);
+    
+    // COMPLETELY NEW APPROACH - create a separate invisible input field to capture barcode
+    // This prevents the native input events from happening on the original field
+    const barcodeInputId = 'barcode-capture-field';
+    
+    // Remove any previous instance
+    $('#' + barcodeInputId).remove();
+    
+    // Create invisible input field dedicated to capturing barcode scans
+    $('body').append('<input type="text" id="' + barcodeInputId + '" style="position:fixed; top:-100px; left:-100px;">');
+    
+    // Focus the invisible input field only when no other fields are focused
+    $('#' + barcodeInputId).focus();
+    
+    // Set up an input listener on the invisible field
+    $('#' + barcodeInputId).on('input', function(e) {
+        const value = $(this).val();
+        
+        // Reset the input immediately to be ready for the next scan
+        $(this).val('');
+        
+        // If the value looks like a barcode (at least 4 characters), use it
+        if (value && value.length >= 4) {
+            console.log('Barcode scanned: ' + value);
+            $('#productCode').val(value);
+            $('#productCode').trigger('blur'); // Trigger validation
+        }
+    });
+    
+    // Only capture clicks outside of input fields to focus the barcode scanner
+    $(document).on('click.barcodeFocus', function(e) {
+        // Check if we clicked on an input or inside an input container
+        const $target = $(e.target);
+        const isInputOrLabel = $target.is('input, textarea, select, label') || 
+                              $target.parents('label').length > 0 || 
+                              $target.hasClass('form-control');
+        
+        // If not clicking on an input or label, focus back to barcode scanner
+        if (!isInputOrLabel) {
+            $('#' + barcodeInputId).focus();
+        }
+    });
+    
+    // Create a visible indicator that barcode scanning is active
+    const indicatorId = 'barcode-scan-indicator';
+    
+    // Allow manual entry if needed by clicking the field
+    $('#productCode').on('click.enableEdit', function() {
+        $(this).attr('readonly', false);
+        $(this).focus();
+    });
+    
+    // Return to scan mode when focus is lost
+    $('#productCode').on('blur.returnToScan', function() {
+        setTimeout(function() {
+            $('#productCode').attr('readonly', true);
+            
+            // Only refocus the barcode field if no other input is focused
+            if (!$('input:focus, textarea:focus, select:focus').length) {
+                $('#' + barcodeInputId).focus();
+            }
+        }, 100);
+    });
+    
+    // Listen for focus events on all inputs within the modal
+    $('#addProductModal input, #addProductModal textarea, #addProductModal select').on('focus.inputTracking', function() {
+        // Don't do anything - just let the input get focus
+        // This ensures we don't interfere with normal form behavior
+    });
+    
+    // When an input loses focus and nothing else is focused, restore barcode scanner
+    $('#addProductModal input, #addProductModal textarea, #addProductModal select').on('blur.inputTracking', function() {
+        setTimeout(function() {
+            // Only refocus barcode scanner if nothing else has focus
+            if (!$('input:focus, textarea:focus, select:focus').length) {
+                $('#' + barcodeInputId).focus();
+            }
+        }, 100);
+    });
+});
+
+// Clean up when modal closes
+$('#addProductModal').on('hidden.bs.modal', function() {
+    console.log('Cleaning up barcode handling');
+    removeAllBarcodeHandlers();
+    
+    // Clean up our special handlers and elements
+    $(document).off('click.barcodeFocus');
+    $('#productCode').off('click.enableEdit');
+    $('#productCode').off('blur.returnToScan');
+    $('#addProductModal input, #addProductModal textarea, #addProductModal select').off('focus.inputTracking blur.inputTracking');
+    $('#productCode').attr('readonly', false);
+    $('#barcode-capture-field').remove();
+    $('#barcode-scan-indicator').remove();
+});
+
+// Remove the global barcode handling since we're using a focused approach
+// ... existing code ...
 </script>

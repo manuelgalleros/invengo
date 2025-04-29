@@ -49,9 +49,10 @@ class Logs extends Admin_Controller {
         $offset = ($page - 1) * $limit;
         
         $search = $this->input->get('search');
-        $date_range = $this->input->get('date_range');
+        $start_date = $this->input->get('start_date');
+        $end_date = $this->input->get('end_date');
         
-        $result = $this->model_logs->get_activities($limit, $offset, $search, $date_range);
+        $result = $this->model_logs->get_activities($limit, $offset, $search, $start_date, $end_date);
         
         $logs = $result['activities'];
         $total_logs = $result['count'];

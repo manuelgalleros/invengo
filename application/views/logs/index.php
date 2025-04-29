@@ -27,10 +27,13 @@
                             <button type="button" class="btn btn-light" id="showLogsBtn"><i class="ti ti-eye align-middle me-1 fs-18"></i> Show Logs</button>
                                 <div class="col-sm-auto">
                                     <div class="input-group">
-                                        <input type="text" class="form-control flatpickr-input" id="dateRangePicker" data-provider="flatpickr" data-date-format="d M" data-range-date="true" placeholder="Select date range" readonly="readonly">
+                                        <input type="text" class="form-control flatpickr-input" id="dateRangePicker" data-provider="flatpickr" data-date-format="Y-m-d" data-range-date="true" placeholder="Select date range" readonly="readonly">
                                         <span class="input-group-text bg-primary border-primary text-white">
                                             <i class="ti ti-calendar fs-15"></i>
                                         </span>
+                                        <button type="button" id="clearDateFilter" class="btn btn-soft-dark ms-1" style="display: none;">
+                                             Clear
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -56,8 +59,10 @@
 
                     <div class="card-footer" id="logsFooter">
                         <div class="d-flex justify-content-between align-items-center">
-                            <div class="text-muted">
-                                <!-- Range info will be inserted here -->
+                            <div class="d-flex align-items-center">
+                                <div class="text-muted me-3">
+                                    <!-- Range info will be inserted here -->
+                                </div>
                             </div>
                             <ul class="pagination mb-0">
                                 <!-- Pagination will be inserted here -->
@@ -92,13 +97,25 @@ $(document).ready(function() {
     // Initialize flatpickr date picker
     flatpickr("#dateRangePicker", {
         mode: "range",
-        dateFormat: "d M",
+        dateFormat: "Y-m-d",
+        altInput: true,
+        altFormat: "F j, Y",
         defaultDate: [new Date().setDate(1), new Date()],
         onChange: function(selectedDates, dateStr, instance) {
             if (selectedDates.length === 2) {
-                loadLogs();
+                // Visual indication that filter is active
+                $("#dateRangePicker").addClass("border-primary");
+                $("#clearDateFilter").show();
+                loadLogs(1);
             }
         }
+    });
+    
+    // Clear date filter
+    $("#clearDateFilter").on('click', function() {
+        $("#dateRangePicker").val('').removeClass("border-primary");
+        $(this).hide();
+        loadLogs(1);
     });
     
     // Search functionality
@@ -147,6 +164,26 @@ $(document).ready(function() {
         var dateRange = $('#dateRangePicker').val();
         var currentScrollPosition = $(window).scrollTop();
         
+        // Extract start and end dates from the range
+        var dates = dateRange.split(' to ');
+        var startDate = dates[0] || '';
+        var endDate = dates.length > 1 ? dates[1] : startDate;
+        
+        // Visual indication of active filter
+        if (startDate) {
+            $("#dateRangePicker").addClass("border-primary");
+            $("#clearDateFilter").show();
+            
+            // Show date filter info
+            let dateFilterText = startDate;
+            if (endDate && endDate !== startDate) {
+                dateFilterText += ' to ' + endDate;
+            }
+        } else {
+            $("#dateRangePicker").removeClass("border-primary");
+            $("#clearDateFilter").hide();
+        }
+        
         // Keep track of the latest log ID to detect new entries
         var latestLogId = $('#logsBody tr:first-child td:first-child').text() || 0;
         
@@ -156,7 +193,8 @@ $(document).ready(function() {
             data: {
                 page: page,
                 search: searchQuery,
-                date_range: dateRange
+                start_date: startDate,
+                end_date: endDate
             },
             dataType: 'json',
             success: function(response) {
@@ -229,7 +267,7 @@ $(document).ready(function() {
                 // Update range info
                 var start = (currentPage - 1) * 10 + 1;
                 var end = Math.min(start + 9, response.totalRecords);
-                var rangeHtml = '<div>Showing ' + start + ' to ' + end + ' of ' + response.totalRecords + ' logs</div>';
+                var rangeHtml = 'Showing ' + start + ' to ' + end + ' of ' + response.totalRecords + ' logs';
                 $('#logsFooter .text-muted').html(rangeHtml);
                 
                 // Only restore scroll position if it's an auto-refresh

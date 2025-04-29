@@ -63,7 +63,7 @@
                                                     <iconify-icon icon="solar:wallet-money-bold-duotone"></iconify-icon>
                                                 </span>
                                             </div>
-                                            <h3 class="mb-0 fw-bold">₱<?php echo number_format($todays_earnings, 2); ?> <small class="text-muted">PHP</small></h3>
+                                            <h3 class="mb-0 fw-bold">₱<?php echo number_format($todays_earnings, 2); ?></h3>
                                         </div>
                                         <p class="mb-0 text-muted mt-auto">
                                              <i class="ti ti-info-circle"></i> <a href="<?php echo base_url('orders/') ?>" class="link-info text-decoration-underline link-offset-2 link-underline-opacity-25 link-underline-opacity-100-hover">View more</a>

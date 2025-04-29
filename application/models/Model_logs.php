@@ -80,10 +80,11 @@ class Model_logs extends CI_Model
      * @param int $limit
      * @param int $offset
      * @param string $search
-     * @param string $date_range
+     * @param string $start_date
+     * @param string $end_date
      * @return array
      */
-    public function get_activities($limit = 10, $offset = 0, $search = '', $date_range = '')
+    public function get_activities($limit = 10, $offset = 0, $search = '', $start_date = '', $end_date = '')
     {
         // Select fields
         $this->db->select('a.id, a.user_id, a.username, a.action, a.description, a.created_at, a.timestamp, u.username as user_username, u.firstname as user_firstname, u.lastname as user_lastname');
@@ -105,17 +106,16 @@ class Model_logs extends CI_Model
         }
         
         // Apply date range if provided
-        if (!empty($date_range)) {
-            $dates = explode(' - ', $date_range);
-            if (count($dates) == 2) {
-                // Ensure Philippine timezone
-                date_default_timezone_set('Asia/Manila');
-                
-                $start_date = strtotime(trim($dates[0]) . ' 00:00:00');
-                $end_date = strtotime(trim($dates[1]) . ' 23:59:59');
-                
-                $this->db->where('a.created_at >=', $start_date);
-                $this->db->where('a.created_at <=', $end_date);
+        if (!empty($start_date)) {
+            // Ensure Philippine timezone
+            date_default_timezone_set('Asia/Manila');
+            
+            $start_timestamp = strtotime($start_date . ' 00:00:00');
+            $this->db->where('a.created_at >=', $start_timestamp);
+            
+            if (!empty($end_date)) {
+                $end_timestamp = strtotime($end_date . ' 23:59:59');
+                $this->db->where('a.created_at <=', $end_timestamp);
             }
         }
         
@@ -139,17 +139,16 @@ class Model_logs extends CI_Model
         }
         
         // Add date range if provided
-        if (!empty($date_range)) {
-            $dates = explode(' - ', $date_range);
-            if (count($dates) == 2) {
-                // Ensure Philippine timezone
-                date_default_timezone_set('Asia/Manila');
-                
-                $start_date = strtotime(trim($dates[0]) . ' 00:00:00');
-                $end_date = strtotime(trim($dates[1]) . ' 23:59:59');
-                
-                $where_clauses[] = "a.created_at >= {$start_date}";
-                $where_clauses[] = "a.created_at <= {$end_date}";
+        if (!empty($start_date)) {
+            // Ensure Philippine timezone
+            date_default_timezone_set('Asia/Manila');
+            
+            $start_timestamp = strtotime($start_date . ' 00:00:00');
+            $where_clauses[] = "a.created_at >= {$start_timestamp}";
+            
+            if (!empty($end_date)) {
+                $end_timestamp = strtotime($end_date . ' 23:59:59');
+                $where_clauses[] = "a.created_at <= {$end_timestamp}";
             }
         }
         

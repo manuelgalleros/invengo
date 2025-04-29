@@ -114,7 +114,7 @@
                           <th style="width:50%">Product</th>
                           <th style="width:20%">Quantity</th>
                           <th style="width:20%">Price</th>
-                          <th style="width:10%">
+                          <th style="width:12%">
                             <button type="button" id="add_row" class="btn btn-soft-info btn-sm">
                               <i class="ti ti-plus"></i>
                             </button>
@@ -155,7 +155,7 @@
                 
                 <!-- Cart Section (Spans Both Rows) -->
                 <div class="cart-container mb-3 mb-lg-0">
-                  <div class="card border sticky-top" style="top: 1rem; z-index: 100;">
+                  <div class="card border">
                     <div class="card-header bg-light d-flex justify-content-between align-items-center">
                       <h5 class="card-title mb-0">
                         <i class="ti ti-shopping-cart me-1"></i> Cart Items
@@ -276,6 +276,185 @@
   </div>
 </div>
 
+<style>
+  /* Fixed cart positioning for various screen sizes */
+  @media (min-width: 1200px) {
+    .d-flex.flex-column.flex-lg-row {
+      display: grid !important;
+      grid-template-columns: 1fr 520px;
+      gap: 1.5rem;
+    }
+    
+    .cart-container {
+      width: 520px;
+      position: sticky;
+      align-self: flex-start;
+      top: 1rem;
+      max-height: calc(100vh - 2rem);
+    }
+    
+    .cart-container .card.border {
+      position: relative; /* Change from sticky to relative */
+      top: 0;
+      max-height: calc(100vh - 2rem);
+      overflow-y: auto;
+    }
+  }
+  
+  @media (min-width: 992px) and (max-width: 1199.98px) {
+    .cart-container {
+      width: 450px;
+      position: sticky;
+      align-self: flex-start;
+      top: 1rem;
+      max-height: calc(100vh - 2rem);
+    }
+    
+    .cart-container .card.border {
+      position: relative; /* Change from sticky to relative */
+      top: 0;
+      max-height: calc(100vh - 2rem);
+      overflow-y: auto;
+    }
+  }
+  
+  @media (max-width: 991.98px) {
+    .cart-container {
+      width: 100%;
+    }
+    
+    .sticky-top {
+      position: relative !important;
+      top: 0 !important;
+    }
+  }
+  
+  /* Products table scrollable after 4 rows */
+  .table-responsive.product-table-container {
+    max-height: 350px; /* Increased height to show more rows on larger screens */
+    overflow-y: auto;
+    border: 1px solid rgba(0,0,0,.125);
+    border-radius: 0.25rem;
+    padding: 0;
+  }
+  
+  /* Fix for white space below table */
+  .product-table-container .table {
+    margin-bottom: 0;
+    border-bottom: 0;
+    table-layout: fixed; /* Fixed table layout */
+    width: 100%;
+  }
+  
+  /* Product column specific width control */
+  #product_info_table th:first-child {
+    width: 50%;
+  }
+  
+  /* Text overflow handling for product names */
+  .select2-container--default .select2-selection--single .select2-selection__rendered {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  /* Handle text overflow in product cells */
+  #product_info_table td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  
+  /* Remove last row bottom border to fix double border issue */
+  .product-table-container tbody tr:last-child td {
+    border-bottom: 0;
+  }
+  
+  /* Sticky header styling */
+  #product_info_table thead {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  }
+  
+  /* Hide the horizontal scrollbar if not needed */
+  .table-responsive::-webkit-scrollbar-horizontal {
+    display: none;
+  }
+  
+  /* Zebra striping for better row visibility */
+  #product_info_table tbody tr:nth-of-type(odd) {
+    background-color: rgba(0,0,0,0.025);
+  }
+  
+  /* Select2 Simplified Fixes */
+  .select2-container {
+    min-width: 100%;
+    width: 100% !important; /* Ensure select2 doesn't overflow */
+  }
+  
+  /* Make dropdown width match the container width */
+  .select2-dropdown {
+    min-width: fit-content;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    max-width: 500px; /* Prevent excessively wide dropdowns */
+  }
+  
+  .select2-container--default .select2-results>.select2-results__options {
+    max-height: 250px;
+  }
+  
+  /* Ensure the select2 stays within its cell */
+  #product_info_table td {
+    position: relative;
+  }
+  
+  /* Fix for card in cart container */
+  .cart-container .card.border.sticky-top {
+    position: relative !important;
+    top: 0 !important;
+    z-index: 1 !important;
+  }
+  
+  /* Cart items styling improvements */
+  #cart-items .list-group-item {
+    transition: background-color 0.2s;
+  }
+  
+  #cart-items .list-group-item:hover {
+    background-color: rgba(0,0,0,0.025);
+  }
+  
+  /* Product name ellipsis for long text */
+  #cart-items h6 {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 300px;
+  }
+  
+  /* Cart items container fixed height */
+  #cart-items-container {
+    max-height: calc(100vh - 300px) !important;
+    min-height: 200px;
+  }
+  
+  /* Invisible barcode input styling */
+  #barcodeScanner {
+    position: fixed;
+    opacity: 0;
+    pointer-events: none;
+    z-index: -1;
+  }
+</style>
+
+<!-- Add invisible input field for barcode scanning -->
+<div id="barcodeScanner">
+  <input type="text" id="barcodeCaptureField" class="form-control" autocomplete="off">
+</div>
+
 <script type="text/javascript">
   var base_url = "<?php echo base_url(); ?>";
 
@@ -322,7 +501,6 @@
       
       // Collect keypresses into buffer
       if((potentiallyScanning || timeDiff < BARCODE_SCAN_SPEED) && e.key.length === 1) {
-        console.log('Adding to barcode buffer:', e.key);
         barcodeBuffer += e.key;
         e.preventDefault();
       }
@@ -332,7 +510,6 @@
         e.preventDefault();
         
         if(barcodeBuffer.length > 0) {
-          console.log('Full barcode detected:', barcodeBuffer);
           
           // Set the global flag to indicate barcode processing
           window.isProcessingBarcode = true;
@@ -359,7 +536,6 @@
     // Process barcode when we lose focus (as a fallback)
     $(window).on('blur', function() {
       if(potentiallyScanning && barcodeBuffer.length > 0) {
-        console.log('Processing barcode on blur:', barcodeBuffer);
         processScannedBarcode(barcodeBuffer);
         barcodeBuffer = '';
         potentiallyScanning = false;
@@ -368,25 +544,13 @@
     
     // Function to process the scanned barcode
     function processScannedBarcode(barcode) {
-      // Debug information about the barcode
-      console.log('Processing barcode:', {
-        'value': barcode,
-        'length': barcode.length,
-        'first character': barcode.charAt(0),
-        'character codes': Array.from(barcode).map(c => c.charCodeAt(0).toString())
-      });
-      
       // Find product by barcode via AJAX
       $.ajax({
         url: base_url + 'orders/getProductByBarcode',
         type: 'post',
         data: {barcode: barcode},
         dataType: 'json',
-        beforeSend: function() {
-          console.log('Sending AJAX request with barcode:', barcode);
-        },
         success: function(response) {
-          console.log('Server response:', response);
           
           if(response.success) {
             // Product found, add to cart
@@ -395,7 +559,6 @@
             // Reset potentiallyScanning flag after successful scan to prepare for the next one
             setTimeout(function() {
               potentiallyScanning = false;
-              console.log('Ready for next barcode scan');
             }, 100);
           } else {
             // Product not found, show error message
@@ -415,7 +578,6 @@
           }
         },
         error: function(xhr, status, error) {
-          console.error('AJAX error:', {xhr: xhr, status: status, error: error});
           
           // Error processing request
           $('#messages').html(`
@@ -437,7 +599,6 @@
     
     // Function to add a product to the cart
     function addProductToCart(product) {
-      console.log('Adding product to cart:', product);
       
       // First check if product is already in the cart
       let productExists = false;
@@ -448,8 +609,6 @@
         const rowId = $(this).attr('id').substring(4);
         const productId = $("#product_" + rowId).val();
         
-        console.log('Checking row:', rowId, 'Product ID:', productId, 'Against:', product.id);
-        
         if(productId == product.id) {
           productExists = true;
           existingRowId = rowId;
@@ -458,7 +617,6 @@
       });
       
       if(productExists) {
-        console.log('Product exists in cart, incrementing quantity in row:', existingRowId);
         // Product already exists, increment quantity
         const currentQty = parseInt($("#qty_" + existingRowId).val()) || 0;
         $("#qty_" + existingRowId).val(currentQty + 1);
@@ -479,13 +637,11 @@
         // Update cart display
         updateCartDisplay();
       } else {
-        console.log('Product not in cart, adding new row');
         // Product doesn't exist, add new row
         // Get the table rows
         const tableRows = $("#product_info_table tbody tr");
         const tableRowsCount = tableRows.length;
         
-        console.log('Table rows count:', tableRowsCount);
         
         // Check if the first row is empty
         const firstRowProduct = $("#product_1").val();
@@ -494,12 +650,10 @@
         if(!firstRowProduct && tableRowsCount > 0) {
           // If first row exists and is empty, use it
           rowId = 1;
-          console.log('Using first empty row');
           addProductToNewRow(product, rowId);
         } else {
           // Otherwise, add a new row
           rowId = tableRowsCount + 1;
-          console.log('Adding new row with ID:', rowId);
           
           // Call add_row to create a new row
           $("#add_row").trigger('click');
@@ -514,7 +668,6 @@
     
     // Helper function to add product to a specific row
     function addProductToNewRow(product, rowId) {
-      console.log('Setting product in row:', rowId, 'Product:', product);
       
       // Set the barcode processing flag before changing the product
       window.isProcessingBarcode = true;
@@ -1004,8 +1157,6 @@
           }
         },
         error: function(xhr, status, error) {
-          console.error('AJAX Error:', status, error);
-          console.log('Response:', xhr.responseText);
           
           // Display error message
           $('#messages').html(`
@@ -1187,7 +1338,7 @@
       var productQty = $("#qty_"+count).val();
       var productRate = $("#rate_"+count).val();
       var productAmount = $("#amount_"+count).val();
-      var productImage = $("#product_image_"+count).val() || "assets/images/product-default.jpg";
+      var productImage = $("#product_image_"+count).val() || "assets/images/product_images/no-image.jpg";
       
       // Only add to cart if product is selected
       if(productId) {
@@ -1223,89 +1374,3 @@
     }
   }
 </script>
-
-<style>
-  @media (min-width: 992px) {
-    .cart-container {
-      width: 520px;
-    }
-  }
-  
-  @media (max-width: 991.98px) {
-    .cart-container {
-      width: 100%;
-    }
-    
-    .sticky-top {
-      position: relative !important;
-      top: 0 !important;
-    }
-  }
-  
-  /* Products table scrollable after 4 rows */
-  .table-responsive.product-table-container {
-    max-height: 285px; /* Height to show approximately 4 rows */
-    overflow-y: auto;
-    border: 1px solid rgba(0,0,0,.125);
-    border-radius: 0.25rem;
-    padding: 0;
-  }
-  
-  /* Fix for white space below table */
-  .product-table-container .table {
-    margin-bottom: 0;
-    border-bottom: 0;
-  }
-  
-  /* Remove last row bottom border to fix double border issue */
-  .product-table-container tbody tr:last-child td {
-    border-bottom: 0;
-  }
-  
-  /* Sticky header styling */
-  #product_info_table thead {
-    position: sticky;
-    top: 0;
-    z-index: 5;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-  }
-  
-  /* Hide the horizontal scrollbar if not needed */
-  .table-responsive::-webkit-scrollbar-horizontal {
-    display: none;
-  }
-  
-  /* Zebra striping for better row visibility */
-  #product_info_table tbody tr:nth-of-type(odd) {
-    background-color: rgba(0,0,0,0.025);
-  }
-  
-  /* Select2 Simplified Fixes */
-  .select2-container {
-    min-width: 100%;
-    width: auto !important;
-  }
-  
-  /* Make dropdown width match the container width */
-  .select2-dropdown {
-    min-width: fit-content;
-    border-radius: 4px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-    max-width: 500px; /* Prevent excessively wide dropdowns */
-  }
-  
-  .select2-container--default .select2-results>.select2-results__options {
-    max-height: 250px;
-  }
-  
-  /* Ensure the select2 stays within its cell */
-  #product_info_table td {
-    position: relative;
-  }
-  
-  #product_info_table td .select2-container {
-    width: 100% !important;
-  }
-  
-  /* Hide the horizontal scrollbar if not needed */
-</style>

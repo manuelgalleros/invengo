@@ -198,17 +198,6 @@
                         </a>
                     </li>
                     <?php endif; ?>
-
-                    <?php if(in_array('updateSetting', $user_permission)): ?>
-                    <li class="side-nav-item">
-                        <a href="<?php echo base_url('users/setting') ?>" class="side-nav-link">
-                            <span class="menu-icon"><i class="ti ti-settings"></i></span>
-                            <span class="menu-text"> Account Settings </span>
-                        </a>
-                    </li>
-                    <?php endif; ?>
-                    
-                    <li class="side-nav-title mt-2">System</li>
                     <?php if(in_array('viewLog', $user_permission)): ?>
                     <li class="side-nav-item">
                         <a href="<?php echo base_url('logs') ?>" class="side-nav-link">
@@ -217,12 +206,14 @@
                         </a>
                     </li>
                     <?php endif; ?>
+                    <?php if(in_array('updateSetting', $user_permission)): ?>
                     <li class="side-nav-item">
-                        <a href="<?php echo base_url('settings') ?>" class="side-nav-link">
-                            <span class="menu-icon"><i class="ti ti-adjustments-alt"></i></span>
-                            <span class="menu-text"> System Settings </span>
+                        <a href="<?php echo base_url('users/setting') ?>" class="side-nav-link">
+                            <span class="menu-icon"><i class="ti ti-settings"></i></span>
+                            <span class="menu-text"> Account Settings </span>
                         </a>
                     </li>
+                    <?php endif; ?>
                 </ul>
             </div>
         </div>

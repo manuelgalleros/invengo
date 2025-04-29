@@ -40,7 +40,7 @@
                     <div class="topbar-item">
                         <div class="dropdown">
                             <button class="topbar-link btn btn-outline-primary btn-icon dropdown-toggle drop-arrow-none" data-bs-toggle="dropdown" data-bs-offset="0,24" type="button" data-bs-auto-close="outside" aria-haspopup="false" aria-expanded="false" style="--bs-btn-hover-bg: var(--bs-info);--bs-btn-hover-border-color: var(--bs-info);--bs-btn-active-bg: var(--bs-info);--bs-btn-active-border-color: var(--bs-info);--bs-btn-disabled-color: var(--bs-info);">
-                                <i class="ti ti-bell animate-ring fs-22"></i>
+                                <i class="ti ti-bell fs-22"></i>
                                 <span class="noti-icon-badge"></span>
                             </button>
 
