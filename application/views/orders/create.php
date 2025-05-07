@@ -133,7 +133,7 @@
                             </select>
                           </td>
                           <td>
-                            <input type="text" name="qty[]" id="qty_1" class="form-control qty" required onkeyup="getTotal(1)">
+                            <input type="number" name="qty[]" id="qty_1" class="form-control qty" required onkeyup="getTotal(1)">
                           </td>
                           <td>
                             <input type="text" name="rate[]" id="rate_1" class="form-control" disabled autocomplete="off">
@@ -547,7 +547,7 @@
       // Find product by barcode via AJAX
       $.ajax({
         url: base_url + 'orders/getProductByBarcode',
-        type: 'post',
+        type: 'POST',
         data: {barcode: barcode},
         dataType: 'json',
         success: function(response) {
@@ -826,7 +826,7 @@
 
       $.ajax({
           url: base_url + '/orders/getTableProductRow/',
-          type: 'post',
+          type: 'POST',
           dataType: 'json',
           success:function(response) {
             
@@ -1214,7 +1214,7 @@
 
     $.ajax({
       url: base_url + 'orders/getProductValueById',
-      type: 'post',
+      type: 'POST',
       data: {product_id : product_id},
       dataType: 'json',
       success:function(response) {
