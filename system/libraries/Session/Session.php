@@ -313,7 +313,7 @@ class CI_Session {
 		$this->_config = $params;
 
 		// Security is king
-		ini_set('session.use_trans_sid', 0);
+		is_php('8.4') OR ini_set('session.use_trans_sid', 0); // deprecated (and already 0 by default) as of PHP 8.4
 		ini_set('session.use_strict_mode', 1);
 		ini_set('session.use_cookies', 1);
 		ini_set('session.use_only_cookies', 1);
@@ -370,7 +370,8 @@ class CI_Session {
 		{
 			$bits_per_character = (int) ini_get('session.sid_bits_per_character');
 			$sid_length         = (int) ini_get('session.sid_length');
-			if (($bits = $sid_length * $bits_per_character) < 160)
+			// session.sid_length is deprecated as of PHP 8.4, so leave it untouched there
+			if (($bits = $sid_length * $bits_per_character) < 160 && is_php('8.4') === FALSE)
 			{
 				// Add as many more characters as necessary to reach at least 160 bits
 				$sid_length += (int) ceil((160 % $bits) / $bits_per_character);
